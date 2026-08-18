@@ -1050,9 +1050,17 @@
     if (app.screen === "screen-game") renderTools();
   });
 
+  function renderGameVersion() {
+    const label = formatGameVersion();
+    for (const id of ["game-version", "diff-version"]) {
+      const el = $(id);
+      if (el) el.textContent = label;
+    }
+  }
+
   syncAudioUi();
   updateSpeedButton();
-  $("game-version").textContent = formatGameVersion();
+  renderGameVersion();
   LifeMusic.start();
   requestAnimationFrame(loop);
 })();

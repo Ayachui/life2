@@ -120,7 +120,17 @@ h1 {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  margin: 10px 0 0;
+  margin: 0 0 10px;
+}
+.game-version--footer {
+  text-align: center;
+  margin: 0;
+  padding: 10px 16px 18px;
+  flex-shrink: 0;
+}
+#screen-menu {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .sources { color: #6f8796; font-size: 12px; line-height: 1.4; margin: 8px 0 0; }
 
@@ -835,8 +845,12 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
     min-width: 0;
   }
 
+  #screen-menu {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
   .menu-card {
-    margin: 4vh auto 0;
+    margin: 4vh auto 16px;
     padding: 28px 22px 22px;
     width: min(560px, calc(100% - 24px));
   }
