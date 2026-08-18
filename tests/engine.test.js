@@ -255,6 +255,27 @@ describe("поиск корма и охота", () => {
     assert.equal(world.canHunt(krol, pred), true);
     assert.equal(world.canHunt(krol, herb), false);
   });
+
+  test("лиса не может есть крол-душегуба", () => {
+    const { world, T } = createWorld();
+    world.set(0, 0, T.PRED);
+    const fox = world.makeAgent(0, 0, T.PRED);
+    world.agents.push(fox);
+    const krol = world.makeAgent(1, 0, T.HERB);
+    krol.trait = "крол-душегуб";
+    world.set(1, 0, T.HERB);
+    world.agents.push(krol);
+    const herb = world.makeAgent(0, 1, T.HERB);
+    world.set(0, 1, T.HERB);
+    world.agents.push(herb);
+    assert.equal(world.canHunt(fox, krol), false);
+    assert.equal(world.canHunt(fox, herb), true);
+    const prey = world.findNearestPrey(0, 0, 3, fox);
+    assert.ok(prey);
+    assert.equal(prey.x, 0);
+    assert.equal(prey.y, 1);
+    assert.equal(world.pouncePrey(fox, { x: 1, y: 0 }), false);
+  });
 });
 
 describe("аркада: конец раунда", () => {

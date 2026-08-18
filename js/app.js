@@ -50,6 +50,10 @@
   }
 
   function showScreen(id) {
+    if (id !== "screen-game") {
+      LifeMusic.stopAlarm();
+      app.krolAlertOpen = false;
+    }
     for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
     $(id).classList.remove("hidden");
     app.screen = id;
@@ -86,6 +90,50 @@
   function closeModal() {
     $("modal").classList.add("hidden");
     $("modal-card").classList.remove("wide");
+    $("modal-card").classList.remove("krol-alert");
+  }
+
+  function notifyMutation(energyGain) {
+    const m = app.world?.lastMutation;
+    if (!m) return;
+    const bonus = energyBonusLabel(energyGain);
+    if (m.special && m.trait === "крол-душегуб") {
+      showKrolAlert(bonus);
+    } else {
+      toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
+    }
+    app.mutToastAt = performance.now();
+  }
+
+  function showKrolAlert(bonus) {
+    const wasPlaying = app.playing;
+    app.playing = false;
+    app.krolAlertOpen = true;
+    $("btn-play").textContent = "▶ Старт";
+
+    LifeMusic.playAlarm();
+    log(`Крол-душегуб появился!${bonus}`);
+
+    const desc = LIFE_DATA.traitDesc["крол-душегуб"] || "охотится на лис";
+    $("modal-card").classList.add("krol-alert");
+    openModal(`
+      <div class="krol-alert-icon">🐇</div>
+      <h3>Крол-душегуб!</h3>
+      <p class="krol-alert-lead">Из мутации родился особый заяец. Лисы его не трогают — он сам охотится на них.</p>
+      <p>${desc}. Живёт недолго, но приносит троих детёнышей.${bonus ? ` Награда:${bonus}` : ""}</p>
+      <div class="modal-actions"><button class="btn primary" id="krol-ok">Понял, продолжить</button></div>
+    `);
+
+    $("krol-ok").onclick = () => {
+      closeModal();
+      LifeMusic.stopAlarm();
+      app.krolAlertOpen = false;
+      if (wasPlaying && !app.gameEnded) {
+        app.playing = true;
+        $("btn-play").textContent = "⏸ Пауза";
+        LifeSound.play("play");
+      }
+    };
   }
 
   function showTutorial(onDone) {
@@ -161,7 +209,7 @@
       ["🐰", "зайцы"], ["🦊", "лисы"], ["🐻", "медведь"], ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"],
       ["ring:#ffd45c", "зоркий"], ["ring:#8ea0d8", "близорукий"],
       ["ring:#ff5d7a", "прожорливый"], ["ring:#3ee0a2", "экономный"],
-      ["ring:#e040fb", "крол-душегуб"]
+      ["🐇", "крол-душегуб"]
     ];
     $("legend").innerHTML = items.map(([mark, n]) => {
       if (mark.startsWith("ring:")) return `<span><i class="ring" style="border-color:${mark.slice(5)}"></i>${n}</span>`;
@@ -370,7 +418,7 @@
       if (a.dead) continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       if (a.trait) drawTraitRing(a.x, a.y, s, a.trait);
-      const icon = a.kind === T.BEAR ? "🐻" : a.kind === T.PRED ? "🦊" : "🐰";
+      const icon = a.kind === T.BEAR ? "🐻" : a.kind === T.PRED ? "🦊" : a.trait === "крол-душегуб" ? "🐇" : "🐰";
       const scale = a.trait === "крол-душегуб" ? 1.08 : 0.88 + 0.1 * sat;
       drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
     }
@@ -570,6 +618,8 @@
     if (app.gameEnded) return;
     app.gameEnded = true;
     app.playing = false;
+    app.krolAlertOpen = false;
+    LifeMusic.stopAlarm();
     $("btn-play").textContent = "▶ Старт";
     LifeSound.play("game_over");
 
@@ -649,14 +699,7 @@
         if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
         acc -= 1;
         if (app.world.lastMutation && (!app.mutToastAt || ts - app.mutToastAt > 1800)) {
-          const m = app.world.lastMutation;
-          const bonus = energyBonusLabel(energyGain);
-          if (m.special && m.trait === "крол-душегуб") {
-            toast(`Особый зайец — крол-душегуб!${bonus}`);
-          } else {
-            toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
-          }
-          app.mutToastAt = ts;
+          notifyMutation(energyGain);
         }
         if (app.world.gameOver) {
           gameOver();
@@ -708,7 +751,7 @@
     else showScreen("screen-menu");
   };
   $("btn-play").onclick = () => {
-    if (app.gameEnded) return;
+    if (app.gameEnded || app.krolAlertOpen) return;
     app.playing = !app.playing;
     if (app.playing) {
       app.started = true;
@@ -719,9 +762,12 @@
     $("btn-play").textContent = app.playing ? "⏸ Пауза" : "▶ Старт";
   };
   $("btn-step").onclick = () => {
-    if (app.gameEnded) return;
+    if (app.gameEnded || app.krolAlertOpen) return;
     app.world.step();
     flushWorldSounds(app.world);
+    const energyGain = flushMutationEnergy();
+    if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
+    if (app.world.lastMutation) notifyMutation(energyGain);
     if (app.world.gameOver) gameOver();
     updateStats();
     draw();
@@ -745,7 +791,9 @@
       <div class="modal-actions"><button class="btn primary" id="help-ok">Понятно</button></div>
     `);
   };
-  $("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
+  $("modal").addEventListener("click", (e) => {
+    if (e.target.id === "modal" && !app.krolAlertOpen) closeModal();
+  });
   document.addEventListener("click", (e) => { if (e.target.id === "help-ok") closeModal(); });
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space" && app.screen === "screen-game") {

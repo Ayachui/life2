@@ -439,6 +439,28 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   cursor: pointer;
 }
 
+.modal-card.krol-alert {
+  width: min(520px, calc(100% - 32px));
+  border-color: #e040fb;
+  box-shadow: 0 0 48px rgba(224, 64, 251, 0.35), var(--shadow);
+  text-align: center;
+}
+.modal-card.krol-alert h3 {
+  color: #f0a8ff;
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+.krol-alert-icon {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 12px rgba(224, 64, 251, 0.6));
+}
+.krol-alert-lead {
+  color: var(--text) !important;
+  font-weight: 800;
+  font-size: 15px;
+}
 .modal-card.wide { width: min(640px, calc(100% - 32px)); }
 .lb-table {
   width: 100%;

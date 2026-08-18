@@ -24,6 +24,11 @@ const DECAY_CFG = {
 const KROL_CHANCE = 0.03;
 const KROL_LIFESPAN = 52;
 const KROL_LITTER = 3;
+const KROL_TRAIT = "крол-душегуб";
+
+function isKrolDushegub(a) {
+  return !!a && a.kind === HERB && a.trait === KROL_TRAIT;
+}
 
 const NO_ANIMAL_RENEWAL_GENS = 90;
 const ARCADE_STALE_AFTER = 40;
@@ -257,6 +262,7 @@ class World {
     let best = null, bestScore = 99;
     for (const o of this.agents) {
       if (o.dead || !kinds.includes(o.kind)) continue;
+      if (hunter?.kind === PRED && isKrolDushegub(o)) continue;
       const dx = o.x - x;
       const dy = o.y - y;
       const dist = distAt(dx, dy);
@@ -348,9 +354,9 @@ class World {
   }
 
   canHunt(killer, victim) {
-    if (killer.kind === PRED) return victim.kind === HERB;
+    if (killer.kind === PRED) return victim.kind === HERB && !isKrolDushegub(victim);
     if (killer.kind === BEAR) return victim.kind === HERB || victim.kind === PRED;
-    if (killer.kind === HERB && killer.trait === "крол-душегуб") return victim.kind === PRED;
+    if (isKrolDushegub(killer)) return victim.kind === PRED;
     return false;
   }
 
