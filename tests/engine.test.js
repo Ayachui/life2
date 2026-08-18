@@ -401,6 +401,23 @@ describe("крол-душегуб", () => {
     world.generation = KROL_LIFESPAN;
     world.stepAgents();
     assert.equal(krol.dead, true);
+    const herbs = world.agents.filter((a) => !a.dead && a.kind === T.HERB && a.trait !== "крол-душегуб");
+    assert.equal(herbs.length, 3);
+  });
+
+  test("после смерти оставляет 3 зайцев даже если убит", () => {
+    const { world, T } = createWorld();
+    world.set(5, 5, T.HERB);
+    const krol = world.makeAgent(5, 5, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 20;
+    world.set(6, 5, T.BEAR);
+    const bear = world.makeAgent(6, 5, T.BEAR);
+    world.agents = [krol, bear];
+    world.pounceVictim(bear, { x: 5, y: 5 });
+    assert.equal(krol.dead, true);
+    const herbs = world.agents.filter((a) => !a.dead && a.kind === T.HERB);
+    assert.equal(herbs.length, 3);
   });
 
   test("не наследуется потомкам", () => {

@@ -1403,6 +1403,7 @@ class World {
 
   killAgent(victim, killer, energyGain) {
     const gain = energyGain ?? 7.2;
+    if (isKrolDushegub(victim)) this.spawnKrolLegacy(victim);
     this.set(victim.x, victim.y, EMPTY);
     victim.dead = true;
     this.deaths++;
