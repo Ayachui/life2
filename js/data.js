@@ -1,5 +1,5 @@
 const LIFE_DATA = {
-  gameVersion: { stage: "alpha", major: 0, minor: 7, patch: 5 },
+  gameVersion: { stage: "alpha", major: 0, minor: 7, patch: 6 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
