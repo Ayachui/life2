@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 7, patch: 12 },
+  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 0 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -38,6 +38,51 @@ const LIFE_DATA = {
     "лось": 28
   },
   plantEvolutionEnergy: 1,
+  // Очки жизни: сумма произведённой и переработанной жизненной энергии.
+  lifePoints: {
+    plant: {
+      sprout: 2,
+      evolveGrass: 4,
+      evolveBush: 12,
+      wilt: 8,
+      place: 3
+    },
+    birth: {
+      rabbit: 8,
+      koala: 12,
+      cow: 24,
+      fox: 14,
+      wolf: 20,
+      elk: 22,
+      bear: 30,
+      krol: 40
+    },
+    death: {
+      rabbit: 5,
+      koala: 8,
+      cow: 18,
+      fox: 10,
+      wolf: 16,
+      elk: 20,
+      bear: 35,
+      krol: 35
+    },
+    mutation: {
+      "коала": 25,
+      "корова": 32,
+      "волк": 38,
+      "лось": 34,
+      "крол-душегуб": 60
+    },
+    place: {
+      herb: 8,
+      pred: 14,
+      bear: 30
+    },
+    activity: {
+      fertilize: 5
+    }
+  },
   difficulties: [
     { id: "easy", label: "Лёгкий", energy: 1000, emoji: "🌿" },
     { id: "medium", label: "Средний", energy: 500, emoji: "🌾" },

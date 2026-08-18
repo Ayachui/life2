@@ -1,6 +1,6 @@
 const LifeLeaderboard = (() => {
   const API = "/api/leaderboard";
-  const LOCAL_KEY = "life-arcade-local-scores-v1";
+  const LOCAL_KEY = "life-arcade-local-scores-v2";
 
   const DIFF_LABELS = {
     easy: "Лёгкий",
@@ -24,7 +24,7 @@ const LifeLeaderboard = (() => {
   function saveLocalEntry(entry) {
     const local = loadLocal();
     local.push(entry);
-    local.sort((a, b) => b.cycles - a.cycles);
+    local.sort((a, b) => b.points - a.points);
     saveLocal(local);
   }
 
@@ -41,10 +41,11 @@ const LifeLeaderboard = (() => {
     }
   }
 
-  async function submitScore({ name, cycles, difficulty }) {
+  async function submitScore({ name, points, cycles, difficulty }) {
     const entry = {
       name: String(name || "Аноним").trim().slice(0, 16),
-      cycles: Number(cycles),
+      points: Number(points) || 0,
+      cycles: Number(cycles) || 0,
       difficulty,
       date: new Date().toISOString().slice(0, 10)
     };

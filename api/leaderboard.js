@@ -6,6 +6,7 @@ const {
   parseBody,
   validDifficulty,
   validateCycles,
+  validatePoints,
   buildEntry,
   packMember,
   unpackScores
@@ -43,7 +44,11 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "POST") {
     const body = parseBody(req);
+    const points = validatePoints(body.points);
     const cycles = validateCycles(body.cycles);
+    if (points === null) {
+      return res.status(400).json({ ok: false, error: "invalid_points" });
+    }
     if (cycles === null) {
       return res.status(400).json({ ok: false, error: "invalid_cycles" });
     }
@@ -56,12 +61,13 @@ module.exports = async function handler(req, res) {
 
     const entry = buildEntry({
       name: body.name,
+      points,
       cycles,
       difficulty: body.difficulty
     });
 
     try {
-      await db.zadd(KEY, { score: cycles, member: packMember(entry) });
+      await db.zadd(KEY, { score: points, member: packMember(entry) });
       const size = await db.zcard(KEY);
       if (size > MAX) await db.zpopmin(KEY, size - MAX);
       return res.status(200).json({ ok: true, saved: true });

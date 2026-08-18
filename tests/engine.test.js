@@ -655,3 +655,49 @@ describe("isAlive", () => {
     assert.equal(world.isAlive(), true);
   });
 });
+
+describe("очки жизни", () => {
+  test("в песочнице очки не начисляются", () => {
+    const { world, T } = createWorld();
+    world.arcade = false;
+    world.setPlant(2, 2, T.STAGE_GRASS, 0);
+    world.awardLifePoints(100);
+    assert.equal(world.lifePoints, 0);
+  });
+
+  test("эволюция растений даёт очки", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.setPlant(2, 2, T.STAGE_GRASS, 0);
+    world.plantAge[world.idx(2, 2)] = 10;
+    world.growPlants();
+    assert.ok(world.lifePoints >= 4);
+    assert.equal(world.get(2, 2), T.PLANT);
+    assert.equal(world.plantStageAt(2, 2), T.STAGE_BUSH);
+  });
+
+  test("посадка и охота дают очки", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.paint(3, 3, "herb");
+    const placed = world.lifePoints;
+    assert.ok(placed >= 16);
+
+    const prey = world.agents[0];
+    const fox = world.makeAgent(6, 5, T.PRED);
+    world.set(6, 5, T.PRED);
+    world.agents.push(fox);
+    world.killAgent(prey, fox, 7.2);
+    assert.ok(world.lifePoints > placed);
+  });
+
+  test("мутация даёт очки", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    const parent = world.makeAgent(3, 3, T.HERB);
+    const baby = world.makeAgent(4, 3, T.HERB, parent);
+    baby.trait = "коала";
+    world.applySpeciesTrait(baby, "коала", 4, 3, parent);
+    assert.ok(world.lifePoints >= 25);
+  });
+});
