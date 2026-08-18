@@ -439,6 +439,57 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   cursor: pointer;
 }
 
+.krol-overlay-bonus {
+  color: var(--amber);
+  font-weight: 800;
+}
+.krol-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(4, 8, 14, 0.88);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(6px);
+}
+.krol-overlay-card {
+  width: min(520px, calc(100% - 32px));
+  background: #10202b;
+  border: 1px solid #e040fb;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 0 48px rgba(224, 64, 251, 0.35), var(--shadow);
+  text-align: center;
+}
+.krol-overlay-card h3 {
+  color: #f0a8ff;
+  font-family: "Fredoka", sans-serif;
+  font-size: 32px;
+  margin: 0 0 12px;
+}
+.gameover-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background: rgba(3, 8, 12, 0.9);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(6px);
+}
+.gameover-card {
+  width: min(520px, calc(100% - 32px));
+  background: #10202b;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.gameover-card h3 {
+  font-family: "Fredoka", sans-serif;
+  font-size: 28px;
+  margin: 0 0 10px;
+}
 .modal-card.krol-alert {
   width: min(520px, calc(100% - 32px));
   border-color: #e040fb;

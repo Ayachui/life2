@@ -17,7 +17,6 @@
     painting: false,
     inspect: null,
     gameEnded: false,
-    krolAlertOpen: false,
     krolResumePlaying: false
   };
 
@@ -53,8 +52,8 @@
 
   function showScreen(id) {
     if (id !== "screen-game") {
-      LifeMusic.stopAlarm();
-      app.krolAlertOpen = false;
+      dismissKrolOverlay(false);
+      hideGameOverOverlay();
     }
     for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
     $(id).classList.remove("hidden");
@@ -90,30 +89,45 @@
     $("modal").classList.remove("hidden");
   }
   function closeModal() {
+    if (app.gameEnded) return;
     $("modal").classList.add("hidden");
     $("modal-card").classList.remove("wide");
     $("modal-card").classList.remove("krol-alert");
+  }
+
+  function isGameOverOverlayOpen() {
+    return !$("gameover-overlay").classList.contains("hidden");
+  }
+
+  function hideGameOverOverlay() {
+    $("gameover-overlay").classList.add("hidden");
+  }
+
+  function showGameOverOverlay(title, cycles, diff) {
+    $("gameover-title").textContent = title;
+    $("gameover-score").innerHTML = `${cycles} <span>ходов</span>`;
+    $("gameover-meta").textContent = `${diff.label} · осталось ⚡ ${app.energy}`;
+    $("gameover-overlay").classList.remove("hidden");
+  }
+
+  function isKrolOverlayOpen() {
+    return !$("krol-overlay").classList.contains("hidden");
   }
 
   function notifyMutation(energyGain) {
     const m = app.world?.lastMutation;
     if (!m) return;
     const bonus = energyBonusLabel(energyGain);
-    if (m.special && m.trait === "крол-душегуб") {
-      if (!app.krolAlertOpen) showKrolAlert(bonus);
-    } else {
-      toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
-    }
+    toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
     app.mutToastAt = performance.now();
     if (app.world) app.world.lastMutation = null;
   }
 
-  function dismissKrolAlert() {
-    if (!app.krolAlertOpen) return;
-    closeModal();
+  function dismissKrolOverlay(resume = true) {
+    if (!isKrolOverlayOpen()) return;
+    $("krol-overlay").classList.add("hidden");
     try { LifeMusic.stopAlarm(); } catch {}
-    app.krolAlertOpen = false;
-    if (app.krolResumePlaying && !app.gameEnded) {
+    if (resume && app.krolResumePlaying && !app.gameEnded) {
       app.playing = true;
       $("btn-play").textContent = "⏸ Пауза";
       LifeSound.play("play");
@@ -121,24 +135,35 @@
     app.krolResumePlaying = false;
   }
 
-  function showKrolAlert(bonus) {
+  function handleKrolSpawn(energyGain) {
+    if (!app.world?.pendingKrolAlert) return;
+    app.world.pendingKrolAlert = null;
+    const bonus = energyBonusLabel(energyGain);
     app.krolResumePlaying = app.playing;
     app.playing = false;
-    app.krolAlertOpen = true;
     $("btn-play").textContent = "▶ Старт";
 
-    try { LifeMusic.playAlarm(); } catch {}
-    log(`Крол-душегуб появился!${bonus}`);
-
     const desc = LIFE_DATA.traitDesc["крол-душегуб"] || "охотится на лис";
-    $("modal-card").classList.add("krol-alert");
-    openModal(`
-      <div class="krol-alert-icon">🐇</div>
-      <h3>Крол-душегуб!</h3>
-      <p class="krol-alert-lead">Из мутации родился особый заяец. Лисы его не трогают — он сам охотится на них.</p>
-      <p>${desc}. Живёт недолго, но приносит троих детёнышей.${bonus ? ` Награда:${bonus}` : ""}</p>
-      <div class="modal-actions"><button class="btn primary" id="krol-ok" type="button">Понял, продолжить</button></div>
-    `);
+    $("krol-overlay-desc").textContent = `${desc}. Живёт недолго, но приносит троих детёнышей.`;
+    const bonusEl = $("krol-overlay-bonus");
+    if (bonus) {
+      bonusEl.textContent = `Награда:${bonus}`;
+      bonusEl.classList.remove("hidden");
+    } else {
+      bonusEl.classList.add("hidden");
+    }
+    $("krol-overlay").classList.remove("hidden");
+    log(`Крол-душегуб появился!${bonus}`);
+    try { LifeMusic.playAlarm(); } catch {}
+  }
+
+  function afterWorldStep(ts, energyGain) {
+    handleKrolSpawn(energyGain);
+    if (isKrolOverlayOpen()) return true;
+    if (app.world.lastMutation && (!app.mutToastAt || ts - app.mutToastAt > 1800)) {
+      notifyMutation(energyGain);
+    }
+    return false;
   }
 
   function showTutorial(onDone) {
@@ -228,8 +253,9 @@
     app.playing = false;
     app.started = false;
     app.gameEnded = false;
-    app.krolAlertOpen = false;
     app.krolResumePlaying = false;
+    dismissKrolOverlay(false);
+    hideGameOverOverlay();
     app.inspect = null;
     app.tool = "plant";
 
@@ -622,49 +648,22 @@
   }
 
   async function gameOver() {
-    if (app.gameEnded) return;
-    app.gameEnded = true;
-    app.playing = false;
-    app.krolAlertOpen = false;
-    LifeMusic.stopAlarm();
-    $("btn-play").textContent = "▶ Старт";
-    LifeSound.play("game_over");
-
+    if (app.gameType !== "arcade") return;
     const cycles = app.world.generation;
     const diff = app.difficulty;
     const title = app.world.gameOverReason === "no_chain"
       ? "Лесу не хватило живых зверей"
       : "Экосистема остановилась";
 
-    if (app.gameType === "arcade") {
-      openModal(`
-        <h3>${title}</h3>
-        <p class="score-big">${cycles} <span>ходов</span></p>
-        <p>${diff.label} · осталось ⚡ ${app.energy}</p>
-        <label class="name-field">Твоё имя<br><input type="text" id="go-name" maxlength="16" placeholder="Исследователь" /></label>
-        <div class="modal-actions">
-          <button class="btn" id="go-menu">Меню</button>
-          <button class="btn" id="go-retry">Ещё раз</button>
-          <button class="btn primary" id="go-submit">В таблицу</button>
-        </div>
-      `);
-      $("go-menu").onclick = () => { closeModal(); showScreen("screen-menu"); };
-      $("go-retry").onclick = () => { closeModal(); startArcade(diff); };
-      $("go-submit").onclick = async () => {
-        const name = $("go-name").value.trim() || "Аноним";
-        const result = await LifeLeaderboard.submitScore({ name, cycles, difficulty: diff.id });
-        closeModal();
-        if (result.saved) {
-          LifeSound.play("score");
-          toast("Записано в общую таблицу!");
-        } else if (result.localOnly) {
-          toast("Сохранено только на этом устройстве — сервер таблицы недоступен");
-        } else {
-          toast("Не удалось записать результат");
-        }
-        showLeaderboard();
-      };
+    if (!app.gameEnded) {
+      app.gameEnded = true;
+      LifeSound.play("game_over");
     }
+    app.playing = false;
+    app.krolResumePlaying = false;
+    dismissKrolOverlay(false);
+    $("btn-play").textContent = "▶ Старт";
+    showGameOverOverlay(title, cycles, diff);
   }
 
   function reset() {
@@ -705,10 +704,7 @@
         const energyGain = flushMutationEnergy();
         if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
         acc -= 1;
-        if (app.world.lastMutation && (!app.mutToastAt || ts - app.mutToastAt > 1800)) {
-          notifyMutation(energyGain);
-        }
-        if (app.krolAlertOpen) break;
+        if (afterWorldStep(ts, energyGain)) break;
         if (app.world.gameOver) {
           gameOver();
           break;
@@ -759,7 +755,14 @@
     else showScreen("screen-menu");
   };
   $("btn-play").onclick = () => {
-    if (app.gameEnded || app.krolAlertOpen) return;
+    if (app.gameEnded) {
+      gameOver();
+      return;
+    }
+    if (isKrolOverlayOpen()) {
+      dismissKrolOverlay(true);
+      return;
+    }
     app.playing = !app.playing;
     if (app.playing) {
       app.started = true;
@@ -770,12 +773,12 @@
     $("btn-play").textContent = app.playing ? "⏸ Пауза" : "▶ Старт";
   };
   $("btn-step").onclick = () => {
-    if (app.gameEnded || app.krolAlertOpen) return;
+    if (app.gameEnded || isKrolOverlayOpen()) return;
     app.world.step();
     flushWorldSounds(app.world);
     const energyGain = flushMutationEnergy();
     if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
-    if (app.world.lastMutation) notifyMutation(energyGain);
+    afterWorldStep(performance.now(), energyGain);
     if (app.world.gameOver) gameOver();
     updateStats();
     draw();
@@ -799,17 +802,32 @@
       <div class="modal-actions"><button class="btn primary" id="help-ok">Понятно</button></div>
     `);
   };
-  $("modal-card").addEventListener("click", (e) => {
-    if (e.target.id === "krol-ok") dismissKrolAlert();
-  });
+  $("go-menu").onclick = () => { hideGameOverOverlay(); showScreen("screen-menu"); };
+  $("go-retry").onclick = () => { hideGameOverOverlay(); startArcade(app.difficulty); };
+  $("go-submit").onclick = async () => {
+    const name = $("go-name").value.trim() || "Аноним";
+    const cycles = app.world.generation;
+    const result = await LifeLeaderboard.submitScore({ name, cycles, difficulty: app.difficulty.id });
+    hideGameOverOverlay();
+    if (result.saved) {
+      LifeSound.play("score");
+      toast("Записано в общую таблицу!");
+    } else if (result.localOnly) {
+      toast("Сохранено только на этом устройстве — сервер таблицы недоступен");
+    } else {
+      toast("Не удалось записать результат");
+    }
+    showLeaderboard();
+  };
+  $("krol-ok").onclick = () => dismissKrolOverlay(true);
   $("modal").addEventListener("click", (e) => {
-    if (e.target.id === "modal" && !app.krolAlertOpen) closeModal();
+    if (e.target.id === "modal") closeModal();
   });
   document.addEventListener("click", (e) => { if (e.target.id === "help-ok") closeModal(); });
   window.addEventListener("keydown", (e) => {
-    if (app.krolAlertOpen && (e.code === "Enter" || e.code === "Space" || e.code === "Escape")) {
+    if (isKrolOverlayOpen() && (e.code === "Enter" || e.code === "Space" || e.code === "Escape")) {
       e.preventDefault();
-      dismissKrolAlert();
+      dismissKrolOverlay(true);
       return;
     }
     if (e.code === "Space" && app.screen === "screen-game") {

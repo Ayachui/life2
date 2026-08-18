@@ -55,6 +55,7 @@ class World {
     this.mutHerb = 0;
     this.mutPred = 0;
     this.lastMutation = null;
+    this.pendingKrolAlert = null;
     this.gameOver = false;
     this.gameOverReason = null;
     this.arcade = false;
@@ -593,6 +594,7 @@ class World {
     this.mutHerb++;
     const energy = this.grantMutationEnergy("крол-душегуб");
     this.lastMutation = { kind: HERB, trait: "крол-душегуб", special: true, x, y, energy };
+    this.pendingKrolAlert = { energy };
     this.fx.push({ x, y, color: "#e040fb", t: 2.4, krol: true });
     this.spark(x, y, "#ff3dff");
     this.spark(x, y, "#ffffff");
@@ -749,7 +751,7 @@ class World {
     this.growPlants();
     this.stepAgents();
     this.generation++;
-    if (!this.isAlive() && !this.sustainedChain) this.gameOver = true;
+    if (this.arcade && !this.isAlive() && !this.sustainedChain) this.gameOver = true;
   }
 
   tickDecays() {

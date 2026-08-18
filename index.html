@@ -104,6 +104,31 @@
   <div id="tutorial" class="tutorial hidden" role="dialog" aria-modal="true">
     <div class="tutorial-inner" id="tutorial-inner"></div>
   </div>
+  <div id="krol-overlay" class="krol-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="krol-overlay-title">
+    <div class="krol-overlay-card">
+      <div class="krol-alert-icon">🐇</div>
+      <h3 id="krol-overlay-title">Крол-душегуб!</h3>
+      <p class="krol-alert-lead">Из мутации родился особый заяец. Лисы его не трогают — он сам охотится на них.</p>
+      <p id="krol-overlay-desc"></p>
+      <p id="krol-overlay-bonus" class="krol-overlay-bonus hidden"></p>
+      <div class="modal-actions">
+        <button class="btn primary" id="krol-ok" type="button">Понял, продолжить</button>
+      </div>
+    </div>
+  </div>
+  <div id="gameover-overlay" class="gameover-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
+    <div class="gameover-card">
+      <h3 id="gameover-title">Игра окончена</h3>
+      <p class="score-big" id="gameover-score">0 <span>ходов</span></p>
+      <p id="gameover-meta"></p>
+      <label class="name-field">Твоё имя<br><input type="text" id="go-name" maxlength="16" placeholder="Исследователь" /></label>
+      <div class="modal-actions">
+        <button class="btn" id="go-menu" type="button">Меню</button>
+        <button class="btn" id="go-retry" type="button">Ещё раз</button>
+        <button class="btn primary" id="go-submit" type="button">В таблицу</button>
+      </div>
+    </div>
+  </div>
   <div id="toasts" class="toasts"></div>
 
   <script src="js/data.js"></script>
