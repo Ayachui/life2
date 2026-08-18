@@ -16,7 +16,9 @@
     world: null,
     painting: false,
     inspect: null,
-    gameEnded: false
+    gameEnded: false,
+    krolAlertOpen: false,
+    krolResumePlaying: false
   };
 
   const canvas = $("world");
@@ -98,20 +100,34 @@
     if (!m) return;
     const bonus = energyBonusLabel(energyGain);
     if (m.special && m.trait === "крол-душегуб") {
-      showKrolAlert(bonus);
+      if (!app.krolAlertOpen) showKrolAlert(bonus);
     } else {
       toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
     }
     app.mutToastAt = performance.now();
+    if (app.world) app.world.lastMutation = null;
+  }
+
+  function dismissKrolAlert() {
+    if (!app.krolAlertOpen) return;
+    closeModal();
+    try { LifeMusic.stopAlarm(); } catch {}
+    app.krolAlertOpen = false;
+    if (app.krolResumePlaying && !app.gameEnded) {
+      app.playing = true;
+      $("btn-play").textContent = "⏸ Пауза";
+      LifeSound.play("play");
+    }
+    app.krolResumePlaying = false;
   }
 
   function showKrolAlert(bonus) {
-    const wasPlaying = app.playing;
+    app.krolResumePlaying = app.playing;
     app.playing = false;
     app.krolAlertOpen = true;
     $("btn-play").textContent = "▶ Старт";
 
-    LifeMusic.playAlarm();
+    try { LifeMusic.playAlarm(); } catch {}
     log(`Крол-душегуб появился!${bonus}`);
 
     const desc = LIFE_DATA.traitDesc["крол-душегуб"] || "охотится на лис";
@@ -121,19 +137,8 @@
       <h3>Крол-душегуб!</h3>
       <p class="krol-alert-lead">Из мутации родился особый заяец. Лисы его не трогают — он сам охотится на них.</p>
       <p>${desc}. Живёт недолго, но приносит троих детёнышей.${bonus ? ` Награда:${bonus}` : ""}</p>
-      <div class="modal-actions"><button class="btn primary" id="krol-ok">Понял, продолжить</button></div>
+      <div class="modal-actions"><button class="btn primary" id="krol-ok" type="button">Понял, продолжить</button></div>
     `);
-
-    $("krol-ok").onclick = () => {
-      closeModal();
-      LifeMusic.stopAlarm();
-      app.krolAlertOpen = false;
-      if (wasPlaying && !app.gameEnded) {
-        app.playing = true;
-        $("btn-play").textContent = "⏸ Пауза";
-        LifeSound.play("play");
-      }
-    };
   }
 
   function showTutorial(onDone) {
@@ -223,6 +228,8 @@
     app.playing = false;
     app.started = false;
     app.gameEnded = false;
+    app.krolAlertOpen = false;
+    app.krolResumePlaying = false;
     app.inspect = null;
     app.tool = "plant";
 
@@ -701,6 +708,7 @@
         if (app.world.lastMutation && (!app.mutToastAt || ts - app.mutToastAt > 1800)) {
           notifyMutation(energyGain);
         }
+        if (app.krolAlertOpen) break;
         if (app.world.gameOver) {
           gameOver();
           break;
@@ -791,11 +799,19 @@
       <div class="modal-actions"><button class="btn primary" id="help-ok">Понятно</button></div>
     `);
   };
+  $("modal-card").addEventListener("click", (e) => {
+    if (e.target.id === "krol-ok") dismissKrolAlert();
+  });
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal" && !app.krolAlertOpen) closeModal();
   });
   document.addEventListener("click", (e) => { if (e.target.id === "help-ok") closeModal(); });
   window.addEventListener("keydown", (e) => {
+    if (app.krolAlertOpen && (e.code === "Enter" || e.code === "Space" || e.code === "Escape")) {
+      e.preventDefault();
+      dismissKrolAlert();
+      return;
+    }
     if (e.code === "Space" && app.screen === "screen-game") {
       e.preventDefault();
       $("btn-play").click();

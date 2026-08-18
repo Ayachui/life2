@@ -334,6 +334,10 @@ class World {
     return false;
   }
 
+  nudgeToward(a, tx, ty) {
+    return this.moveTowardTarget(a, tx, ty) || this.wanderAgent(a);
+  }
+
   wanderBiasChance(a) {
     if (a.trait === "прожорливый") return 0.52;
     if (a.trait === "экономный") return 0.22;
@@ -395,20 +399,18 @@ class World {
 
     const target = this.findNearestEdible(a.x, a.y, a.vision || 7);
     if (target) {
-      if (this.moveTowardTarget(a, target.x, target.y)) {
-        const after = this.findNearestEdible(a.x, a.y, 1, "touch");
-        if (after) this.startEating(a, after);
-      }
+      this.nudgeToward(a, target.x, target.y);
+      const after = this.findNearestEdible(a.x, a.y, 1, "touch");
+      if (after) this.startEating(a, after);
       return;
     }
 
     if (isKrol) {
       const fox = this.findNearestAgent(a.x, a.y, a.vision || 8, [PRED], a);
       if (fox) {
-        if (this.moveTowardTarget(a, fox.x, fox.y)) {
-          const adj = this.findNearestAgent(a.x, a.y, 1, [PRED], a, "touch");
-          if (adj) this.pounceVictim(a, adj, 8.5);
-        }
+        this.nudgeToward(a, fox.x, fox.y);
+        const adj = this.findNearestAgent(a.x, a.y, 1, [PRED], a, "touch");
+        if (adj) this.pounceVictim(a, adj, 8.5);
         return;
       }
     }
@@ -440,23 +442,21 @@ class World {
 
     const prey = this.findNearestAgent(a.x, a.y, a.vision || 5, preyKinds, a);
     if (prey) {
-      if (this.moveTowardTarget(a, prey.x, prey.y)) {
-        const adj = this.findNearestAgent(a.x, a.y, 1, preyKinds, a, "touch");
-        if (adj) {
-          const victim = this.agentAt(adj.x, adj.y);
-          const gain = victim?.kind === PRED ? 9.5 : 6.5;
-          this.pounceVictim(a, adj, gain);
-        }
+      this.nudgeToward(a, prey.x, prey.y);
+      const adj = this.findNearestAgent(a.x, a.y, 1, preyKinds, a, "touch");
+      if (adj) {
+        const victim = this.agentAt(adj.x, adj.y);
+        const gain = victim?.kind === PRED ? 9.5 : 6.5;
+        this.pounceVictim(a, adj, gain);
       }
       return;
     }
 
     const plant = this.findNearestEdible(a.x, a.y, a.vision || 5);
     if (plant) {
-      if (this.moveTowardTarget(a, plant.x, plant.y)) {
-        const after = this.findNearestEdible(a.x, a.y, 1, "touch");
-        if (after) this.startEating(a, after);
-      }
+      this.nudgeToward(a, plant.x, plant.y);
+      const after = this.findNearestEdible(a.x, a.y, 1, "touch");
+      if (after) this.startEating(a, after);
       return;
     }
 
@@ -476,8 +476,7 @@ class World {
       return;
     }
 
-    if (!this.moveTowardTarget(a, target.x, target.y)) return;
-
+    this.nudgeToward(a, target.x, target.y);
     const adj = this.findNearestPrey(a.x, a.y, 1, a, "touch");
     if (adj) this.pouncePrey(a, adj);
   }
