@@ -225,8 +225,8 @@
     app.playing = false;
     $("btn-play").textContent = "▶ Старт";
 
-    const desc = LIFE_DATA.speciesHelp["крол-душегуб"] || "охотится на всех зверей";
-    $("krol-overlay-desc").textContent = `${desc}. Живёт недолго, но приносит троих детёнышей.`;
+    const desc = LIFE_DATA.speciesHelp["крол-душегуб"] || "2×2, жрёт всё вокруг";
+    $("krol-overlay-desc").textContent = `${desc}. Живёт 15 циклов, оставляет 3 зайцев.`;
     const bonusEl = $("krol-overlay-bonus");
     if (bonus) {
       bonusEl.textContent = `Награда:${bonus}`;
@@ -600,17 +600,19 @@
     }
 
     for (const a of w.agents) {
-      if (a.dead) continue;
+      if (a.dead || a.trait === "крол-душегуб") continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       const icon = agentIcon(a);
-      if (a.trait === "крол-душегуб") {
-        drawSpanEmoji(icon, a.x, a.y, 2, s, 0.45 + 0.55 * sat);
-        continue;
-      }
       const scale = a.trait === "корова" ? 1.05
         : a.trait === "лось" ? 1.02
         : 0.88 + 0.1 * sat;
       drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
+    }
+
+    for (const a of w.agents) {
+      if (a.dead || a.trait !== "крол-душегуб") continue;
+      const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
+      drawSpanEmoji(agentIcon(a), a.x, a.y, 2, s, 0.45 + 0.55 * sat);
     }
 
     if (app.inspect) {
@@ -662,10 +664,15 @@
   function drawSpanEmoji(emoji, x, y, span, s, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = `${Math.max(14, Math.floor(s * span * 0.88))}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    const cx = (x + span / 2) * s;
+    const cy = (y + span / 2) * s;
+    const fontSize = Math.max(12, Math.floor(s * 0.92));
+    ctx.font = `${fontSize}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(emoji, (x + span / 2) * s, (y + span / 2) * s);
+    ctx.translate(cx, cy);
+    ctx.scale(span * 0.95, span * 0.95);
+    ctx.fillText(emoji, 0, 0);
     ctx.restore();
   }
 
@@ -755,7 +762,7 @@
       }
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
         : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
-        : a.trait === "крол-душегуб" ? `2×2 клетки, при рождении жрёт всё вокруг родителя, восприятие ${a.vision} кл.`
+        : a.trait === "крол-душегуб" ? `2×2, зона разрушения 4×4, ×6 действий/цикл, восприятие ${a.vision} кл.`
         : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
         : `восприятие ${a.vision} кл.`;
       return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}`;

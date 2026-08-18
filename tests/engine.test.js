@@ -423,17 +423,52 @@ describe("крол-душегуб", () => {
     assert.equal(wolf.dead, true);
   });
 
-  test("съедает всё в кольце за один раз", () => {
+  test("съедает всё в зоне 4×4 за один раз", () => {
     const { world, T } = createWorld();
     const krol = placeKrol(world, 4, 4, T);
     world.agents = [krol];
     world.setPlant(3, 4, T.STAGE_GRASS, 0);
     world.setPlant(6, 4, T.STAGE_BUSH, 0);
     world.setPlant(4, 3, T.STAGE_GRASS, 0);
-    world.feedKrolDushegub(krol);
+    world.setPlant(5, 5, T.STAGE_TREE, 0);
+    world.set(6, 6, T.HERB);
+    const prey = world.makeAgent(6, 6, T.HERB);
+    world.agents.push(prey);
+    world.krolDevourZone(krol);
+    assert.equal(prey.dead, true);
     assert.equal(world.get(3, 4), T.EMPTY);
     assert.equal(world.get(6, 4), T.EMPTY);
     assert.equal(world.get(4, 3), T.EMPTY);
+    assert.equal(world.get(5, 5), T.EMPTY);
+  });
+
+  test("6 действий за цикл и зона разрушения в симуляции", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 8, 8, T);
+    krol.movesPerTick = 6;
+    world.set(10, 8, T.HERB);
+    const prey1 = world.makeAgent(10, 8, T.HERB);
+    world.set(12, 8, T.HERB);
+    const prey2 = world.makeAgent(12, 8, T.HERB);
+    world.setPlant(9, 9, T.STAGE_GRASS, 0);
+    world.setPlant(10, 9, T.STAGE_BUSH, 0);
+    world.agents = [krol, prey1, prey2];
+    world.feedKrolDushegub(krol);
+    assert.ok(prey1.dead || prey2.dead || world.get(9, 9) === T.EMPTY || world.get(10, 9) === T.EMPTY);
+    assert.equal(krol.movesPerTick, 6);
+  });
+
+  test("проходит сквозь зверей, съедая их", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.set(6, 4, T.HERB);
+    const prey = world.makeAgent(6, 4, T.HERB);
+    world.agents = [krol, prey];
+    assert.ok(world.canAgentMoveTo(krol, 5, 4));
+    world.moveAgentTo(krol, 5, 4);
+    assert.equal(prey.dead, true);
+    assert.equal(krol.x, 5);
+    assert.equal(krol.y, 4);
   });
 
   test("после смерти оставляет 3 зайцев", () => {

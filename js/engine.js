@@ -45,7 +45,7 @@ const MUT_CHANCE = {
 
 const KROL_LIFESPAN = 15;
 const KROL_DEATH_SPAWN = 3;
-const KROL_MOVES_PER_TICK = 3;
+const KROL_MOVES_PER_TICK = 6;
 const KROL_SIZE = 2;
 const WOLF_SOLITUDE = 10;
 const ELK_POOP_INTERVAL = 5;
@@ -54,7 +54,7 @@ const SPECIES_CFG = {
   [TRAIT.COW]: { energy: 50, drain: 1.2, thresh: 22, vision: 6, hue: 52, litter: 1, moveInterval: 4 },
   [TRAIT.WOLF]: { energy: 14, drain: 0.52, thresh: 15, vision: 12, hue: 220, litter: 1, moveInterval: 1 },
   [TRAIT.ELK]: { energy: 25, drain: 0.32, thresh: 17, vision: 9, hue: 185, litter: 1, moveInterval: 1 },
-  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 9, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 3 }
+  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 12, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 6 }
 };
 
 const NO_ANIMAL_RENEWAL_GENS = 90;
@@ -244,22 +244,23 @@ class World {
     return true;
   }
 
-  krolDevourFootprint(a, exempt = []) {
+  krolDevourCells(a, cells, exempt = []) {
     const exemptSet = new Set(exempt);
-    const footprint = agentFootprint(a);
     let ate = false;
+    let hunted = false;
 
     const victims = [];
     for (const o of this.agents) {
       if (o.dead || o === a || exemptSet.has(o)) continue;
-      if (footprint.some((c) => agentOccupies(o, c.x, c.y)) && this.canHunt(a, o)) victims.push(o);
+      if (cells.some((c) => agentOccupies(o, c.x, c.y)) && this.canHunt(a, o)) victims.push(o);
     }
     for (const victim of victims) {
       this.killAgent(victim, a, this.krolHuntGain(victim));
       ate = true;
+      hunted = true;
     }
 
-    for (const c of footprint) {
+    for (const c of cells) {
       if (this.get(c.x, c.y) !== PLANT) continue;
       a.energy += this.plantEnergyRemaining(c.x, c.y);
       this.clearPlant(c.x, c.y);
@@ -267,8 +268,28 @@ class World {
       ate = true;
     }
 
-    if (ate) this.chime(victims.length ? "krol_hunt" : "eat_grass");
+    if (ate) this.chime(hunted ? "krol_hunt" : "eat_grass");
     return ate;
+  }
+
+  krolDevourFootprint(a, exempt = []) {
+    return this.krolDevourCells(a, agentFootprint(a), exempt);
+  }
+
+  krolDevourZoneCells(a) {
+    const cells = [];
+    for (let dy = -1; dy <= KROL_SIZE; dy++) {
+      for (let dx = -1; dx <= KROL_SIZE; dx++) {
+        const cx = a.x + dx;
+        const cy = a.y + dy;
+        if (this.inside(cx, cy)) cells.push({ x: cx, y: cy });
+      }
+    }
+    return cells;
+  }
+
+  krolDevourZone(a, exempt = []) {
+    return this.krolDevourCells(a, this.krolDevourZoneCells(a), exempt);
   }
 
   birthKrolAroundParent(baby, parent) {
@@ -291,11 +312,12 @@ class World {
         if (!this.inside(c.x, c.y)) return false;
         const t = this.get(c.x, c.y);
         if (t === WALL && !(this.arcade && this.inDish(c.x, c.y))) return false;
-        if (t !== EMPTY && t !== PLANT && !agentOccupies(a, c.x, c.y)) {
-          if (!(this.arcade && this.inDish(c.x, c.y) && (t === WATER || t === WALL))) return false;
-        }
         const other = this.agentAt(c.x, c.y);
-        if (other && other !== a) return false;
+        if (t !== EMPTY && t !== PLANT && !agentOccupies(a, c.x, c.y)) {
+          const preyPass = other && other !== a && this.canHunt(a, other);
+          if (!preyPass && !(this.arcade && this.inDish(c.x, c.y) && (t === WATER || t === WALL))) return false;
+        }
+        if (other && other !== a && !this.canHunt(a, other)) return false;
       }
       return true;
     }
@@ -304,17 +326,8 @@ class World {
     return !other || other === a;
   }
 
-  krolEatRingCells(a) {
-    const cells = [];
-    for (let dy = -1; dy <= KROL_SIZE; dy++) {
-      for (let dx = -1; dx <= KROL_SIZE; dx++) {
-        if (dx >= 0 && dx < KROL_SIZE && dy >= 0 && dy < KROL_SIZE) continue;
-        const cx = a.x + dx;
-        const cy = a.y + dy;
-        if (this.inside(cx, cy)) cells.push({ x: cx, y: cy });
-      }
-    }
-    return cells;
+  krolDevourRing(a) {
+    return this.krolDevourZone(a);
   }
 
   plantEnergyRemaining(x, y) {
@@ -325,32 +338,6 @@ class World {
     if (stage === STAGE_BUSH) return bites * PLANT_CFG.bushEnergyPerBite;
     if (stage === STAGE_TREE) return bites * PLANT_CFG.treeEnergyPerBite * 1.2;
     return 0;
-  }
-
-  krolDevourRing(a) {
-    const ring = this.krolEatRingCells(a);
-    let ate = false;
-
-    const victims = [];
-    for (const o of this.agents) {
-      if (o.dead || o === a) continue;
-      if (ring.some((c) => agentOccupies(o, c.x, c.y)) && this.canHunt(a, o)) victims.push(o);
-    }
-    for (const victim of victims) {
-      this.killAgent(victim, a, this.krolHuntGain(victim));
-      ate = true;
-    }
-
-    for (const c of ring) {
-      if (this.get(c.x, c.y) !== PLANT) continue;
-      a.energy += this.plantEnergyRemaining(c.x, c.y);
-      this.clearPlant(c.x, c.y);
-      this.spark(c.x, c.y, "#ffc14d");
-      ate = true;
-    }
-
-    if (ate) this.chime(victims.length ? "krol_hunt" : "eat_grass");
-    return ate;
   }
 
   clearPlant(x, y) {
@@ -786,12 +773,12 @@ class World {
 
   moveAgentTo(a, x, y) {
     if (isKrolDushegub(a)) {
-      for (const c of krolFootprintAt(x, y)) {
-        if (this.get(c.x, c.y) === PLANT) {
-          a.energy += this.plantEnergyRemaining(c.x, c.y);
-          this.spark(c.x, c.y, "#ffc14d");
-        }
-      }
+      this.clearAgentCells(a);
+      a.x = x;
+      a.y = y;
+      this.krolDevourZone(a);
+      this.occupyAgentCells(a);
+      return;
     }
     this.clearAgentCells(a);
     a.x = x;
@@ -944,27 +931,26 @@ class World {
   }
 
   feedKrolDushegub(a) {
-    if (this.krolDevourRing(a)) return;
-
-    for (let m = 0; m < KROL_MOVES_PER_TICK; m++) {
-      if (this.krolDevourRing(a)) return;
+    const moves = a.movesPerTick || KROL_MOVES_PER_TICK;
+    for (let m = 0; m < moves; m++) {
+      if (this.krolDevourZone(a)) continue;
 
       const aware = this.perceive(a);
-      const nearbyPrey = aware.prey.filter((p) => p.dist <= 1.5);
+      const nearbyPrey = aware.prey.filter((p) => p.dist <= 2);
       if (nearbyPrey.length) {
         this.nudgeToward(a, nearbyPrey[0].x, nearbyPrey[0].y);
-        if (this.krolDevourRing(a)) return;
+        this.krolDevourZone(a);
         continue;
       }
 
       const food = this.krolSortFood(aware.food);
       if (food.length) {
         this.nudgeToward(a, food[0].x, food[0].y);
-        if (this.krolDevourRing(a)) return;
+        this.krolDevourZone(a);
         continue;
       }
 
-      this.wanderAgent(a);
+      if (this.wanderAgent(a)) this.krolDevourZone(a);
     }
   }
 
@@ -1809,7 +1795,7 @@ window.World = World;
 window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
 window.PLANT_CFG = PLANT_CFG;
 window.KROL_LIFESPAN = KROL_LIFESPAN;
-window.KROL_SIZE = KROL_SIZE;
+window.KROL_MOVES_PER_TICK = KROL_MOVES_PER_TICK;
 window.TRAIT = TRAIT;
 window.SPECIES_CFG = SPECIES_CFG;
 window.MUT_CHANCE = MUT_CHANCE;

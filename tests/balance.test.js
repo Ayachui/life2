@@ -131,4 +131,11 @@ describe("баланс: мутации", () => {
     assert.equal(parent.gen, 1);
     assert.equal(baby.gen, 2);
   });
+
+  test("крол-душегуб: 6 действий за цикл", () => {
+    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
+    const match = engineSrc.match(/KROL_MOVES_PER_TICK\s*=\s*(\d+)/);
+    assert.ok(match);
+    assert.equal(Number(match[1]), 6);
+  });
 });
