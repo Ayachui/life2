@@ -1,30 +1,26 @@
 const { Redis } = require("@upstash/redis");
-
-const KEY = "life:arcade:leaderboard";
-const MAX = 50;
+const {
+  KEY,
+  MAX,
+  redisFromEnv,
+  parseBody,
+  validDifficulty,
+  validateCycles,
+  buildEntry,
+  packMember,
+  unpackScores
+} = require("./leaderboard-lib");
 
 function redis() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return new Redis({ url, token });
+  const cfg = redisFromEnv();
+  if (!cfg) return null;
+  return new Redis(cfg);
 }
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
-function sanitizeName(name) {
-  return String(name || "Аноним")
-    .trim()
-    .slice(0, 16)
-    .replace(/[<>"'&]/g, "");
-}
-
-function validDifficulty(d) {
-  return ["easy", "medium", "hard", "hardcore"].includes(d);
 }
 
 module.exports = async function handler(req, res) {
@@ -39,47 +35,37 @@ module.exports = async function handler(req, res) {
     }
     try {
       const raw = await db.zrange(KEY, 0, MAX - 1, { rev: true, withScores: true });
-      const scores = [];
-      for (let i = 0; i < raw.length; i += 2) {
-        try {
-          scores.push({ ...JSON.parse(raw[i]), cycles: raw[i + 1] });
-        } catch {
-          /* skip corrupt */
-        }
-      }
-      return res.status(200).json({ ok: true, scores });
-    } catch (e) {
+      return res.status(200).json({ ok: true, scores: unpackScores(raw) });
+    } catch {
       return res.status(500).json({ ok: false, error: "read_failed" });
     }
   }
 
   if (req.method === "POST") {
-    const { name, cycles, difficulty, secret } = req.body || {};
-    const c = Number(cycles);
-    if (!Number.isFinite(c) || c < 1 || c > 999999) {
+    const body = parseBody(req);
+    const cycles = validateCycles(body.cycles);
+    if (cycles === null) {
       return res.status(400).json({ ok: false, error: "invalid_cycles" });
     }
-    if (!validDifficulty(difficulty)) {
+    if (!validDifficulty(body.difficulty)) {
       return res.status(400).json({ ok: false, error: "invalid_difficulty" });
-    }
-    const expected = process.env.LEADERBOARD_SECRET;
-    if (expected && secret !== expected) {
-      return res.status(403).json({ ok: false, error: "forbidden" });
     }
     if (!db) {
       return res.status(503).json({ ok: false, error: "no_storage", offline: true });
     }
-    const entry = JSON.stringify({
-      name: sanitizeName(name),
-      difficulty,
-      date: new Date().toISOString().slice(0, 10)
+
+    const entry = buildEntry({
+      name: body.name,
+      cycles,
+      difficulty: body.difficulty
     });
+
     try {
-      await db.zadd(KEY, { score: c, member: entry });
+      await db.zadd(KEY, { score: cycles, member: packMember(entry) });
       const size = await db.zcard(KEY);
       if (size > MAX) await db.zpopmin(KEY, size - MAX);
-      return res.status(200).json({ ok: true });
-    } catch (e) {
+      return res.status(200).json({ ok: true, saved: true });
+    } catch {
       return res.status(500).json({ ok: false, error: "write_failed" });
     }
   }

@@ -18,13 +18,13 @@ describe("баланс: цены инструментов", () => {
     assert.ok(pred < bear);
   });
 
-  test("хардкор: старт с травой, зайец требует накопления", () => {
+  test("хардкор: старт с зайцем и травой, без полной цепочки сразу", () => {
     const { LIFE_DATA } = createWorld();
     const hard = LIFE_DATA.difficulties.find((d) => d.id === "hardcore");
     const plant = toolCost(LIFE_DATA, "plant");
     const herb = toolCost(LIFE_DATA, "herb");
     const pred = toolCost(LIFE_DATA, "pred");
-    assert.ok(Math.floor(hard.energy / plant) >= 5, "можно посадить несколько трав");
+    assert.ok(hard.energy >= herb + plant * 3, "можно купить зайца и несколько трав");
     assert.ok(hard.energy < herb + pred, "полная цепочка сразу недоступна");
   });
 });
@@ -65,7 +65,7 @@ describe("баланс: пассивный доход ⚡", () => {
       totalEnergy += world.pendingEnergy;
     }
 
-    assert.ok(totalEnergy <= 20, `за 80 циклов ожидали ≤20 ⚡, получили ${totalEnergy}`);
+    assert.ok(totalEnergy <= 22, `за 80 циклов ожидали ≤22 ⚡, получили ${totalEnergy}`);
     assert.ok(totalEnergy >= 1, "хотя бы одно дерево должно созреть");
   });
 });

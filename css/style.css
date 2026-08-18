@@ -453,6 +453,7 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
 }
 .lb-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .lb-table .empty-lb { text-align: center; color: var(--muted); padding: 20px; }
+.lb-note { color: var(--amber); font-size: 13px; line-height: 1.45; margin: 0 0 14px; }
 .score-big {
   font-family: "Fredoka", sans-serif;
   font-size: 48px;

@@ -21,15 +21,23 @@ const LifeLeaderboard = (() => {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(scores.slice(0, 50)));
   }
 
+  function saveLocalEntry(entry) {
+    const local = loadLocal();
+    local.push(entry);
+    local.sort((a, b) => b.cycles - a.cycles);
+    saveLocal(local);
+  }
+
   async function fetchScores() {
     try {
       const res = await fetch(API);
       const data = await res.json();
-      if (data.ok && data.scores?.length) return data.scores;
-      if (data.offline) return loadLocal();
-      return data.scores || [];
+      if (data.ok && !data.offline) {
+        return { scores: data.scores || [], source: "server" };
+      }
+      return { scores: loadLocal(), source: "local" };
     } catch {
-      return loadLocal();
+      return { scores: loadLocal(), source: "local" };
     }
   }
 
@@ -40,10 +48,7 @@ const LifeLeaderboard = (() => {
       difficulty,
       date: new Date().toISOString().slice(0, 10)
     };
-    const local = loadLocal();
-    local.push(entry);
-    local.sort((a, b) => b.cycles - a.cycles);
-    saveLocal(local);
+    saveLocalEntry(entry);
 
     try {
       const res = await fetch(API, {
@@ -51,9 +56,16 @@ const LifeLeaderboard = (() => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry)
       });
-      return await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        return { ok: true, saved: true, localOnly: false };
+      }
+      if (data.offline || data.error === "no_storage") {
+        return { ok: true, saved: false, localOnly: true, error: data.error };
+      }
+      return { ok: false, saved: false, localOnly: true, error: data.error || "submit_failed" };
     } catch {
-      return { ok: true, offline: true };
+      return { ok: true, saved: false, localOnly: true, error: "network" };
     }
   }
 

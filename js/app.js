@@ -538,7 +538,7 @@
   }
 
   async function showLeaderboard() {
-    const scores = await LifeLeaderboard.fetchScores();
+    const { scores, source } = await LifeLeaderboard.fetchScores();
     const rows = scores.length
       ? scores.map((s, i) => {
           const diff = LifeLeaderboard.DIFF_LABELS[s.difficulty] || s.difficulty || "—";
@@ -546,10 +546,15 @@
         }).join("")
       : '<tr><td colspan="5" class="empty-lb">Пока пусто — сыграй в аркаду!</td></tr>';
 
+    const note = source === "local"
+      ? '<p class="lb-note">Показаны записи только с этого устройства. Общая таблица появится, когда сервер подключён.</p>'
+      : "";
+
     openModal(`
       <h3>🏆 Таблица лидеров</h3>
+      ${note}
       <table class="lb-table">
-        <thead><tr><th>#</th><th>Имя</th><th>Циклы</th><th>Сложность</th><th>Дата</th></tr></thead>
+        <thead><tr><th>#</th><th>Имя</th><th>Ходы</th><th>Сложность</th><th>Дата</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="modal-actions"><button class="btn primary" id="lb-close">Закрыть</button></div>
@@ -590,10 +595,16 @@
       $("go-retry").onclick = () => { closeModal(); startArcade(diff); };
       $("go-submit").onclick = async () => {
         const name = $("go-name").value.trim() || "Аноним";
-        await LifeLeaderboard.submitScore({ name, cycles, difficulty: diff.id });
+        const result = await LifeLeaderboard.submitScore({ name, cycles, difficulty: diff.id });
         closeModal();
-        LifeSound.play("score");
-        toast("Записано в таблицу!");
+        if (result.saved) {
+          LifeSound.play("score");
+          toast("Записано в общую таблицу!");
+        } else if (result.localOnly) {
+          toast("Сохранено только на этом устройстве — сервер таблицы недоступен");
+        } else {
+          toast("Не удалось записать результат");
+        }
         showLeaderboard();
       };
     }

@@ -26,7 +26,7 @@ const KROL_LIFESPAN = 52;
 const KROL_LITTER = 3;
 
 const NO_ANIMAL_RENEWAL_GENS = 90;
-const ARCADE_STALE_AFTER = 35;
+const ARCADE_STALE_AFTER = 40;
 const ARCADE_LONELY_MAX = 120;
 const CHAIN_SUSTAIN_GENS = 25;
 
@@ -744,7 +744,7 @@ class World {
     this.growPlants();
     this.stepAgents();
     this.generation++;
-    if (!this.isAlive()) this.gameOver = true;
+    if (!this.isAlive() && !this.sustainedChain) this.gameOver = true;
   }
 
   tickDecays() {
@@ -1007,3 +1007,6 @@ window.World = World;
 window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
 window.PLANT_CFG = PLANT_CFG;
 window.KROL_LIFESPAN = KROL_LIFESPAN;
+window.ARCADE_STALE_AFTER = ARCADE_STALE_AFTER;
+window.ARCADE_LONELY_MAX = ARCADE_LONELY_MAX;
+window.CHAIN_SUSTAIN_GENS = CHAIN_SUSTAIN_GENS;

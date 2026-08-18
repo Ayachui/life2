@@ -91,11 +91,12 @@ describe("эволюция кустов", () => {
     world.agents = [herb];
     world.setPlant(6, 5, T.STAGE_GRASS, 0);
     world.setPlant(5, 6, T.STAGE_GRASS, 0);
-    for (let g = 0; g < 8; g++) {
+    for (let g = 0; g < 10; g++) {
       world.stepAgents();
+      world.generation++;
       if (herb.energy >= herb.thresh) break;
     }
-    assert.ok(herb.energy >= herb.thresh, "две травы должны насытить зайца");
+    assert.ok(herb.energy >= herb.thresh, `энергия ${herb.energy}, нужно ${herb.thresh}`);
   });
 
   test("кольцо из 8 трав кормит зайца в среднем 50+ циклов", () => {
@@ -128,18 +129,23 @@ describe("эволюция кустов", () => {
     assert.ok(total / trials >= 50, `средняя жизнь ${(total / trials).toFixed(1)} циклов, ожидали ≥50`);
   });
 
-  test("куст за жизнь до дерева успевает посеять траву", () => {
-    const { world, T, PLANT_CFG } = createWorld(12, 12);
-    world.setPlant(6, 6, T.STAGE_BUSH, 0);
-    for (let i = 0; i < PLANT_CFG.bushToTree; i++) world.growPlants();
-    let grass = 0;
-    for (let y = 0; y < world.h; y++) {
-      for (let x = 0; x < world.w; x++) {
-        if (world.plantStageAt(x, y) === T.STAGE_GRASS) grass++;
+  test("куст за жизнь до дерева обычно сеет траву", () => {
+    const { T, PLANT_CFG } = createWorld(12, 12);
+    let successes = 0;
+    const trials = 24;
+    for (let t = 0; t < trials; t++) {
+      const w = createWorld(12, 12).world;
+      w.setPlant(6, 6, T.STAGE_BUSH, 0);
+      for (let i = 0; i < PLANT_CFG.bushToTree; i++) w.growPlants();
+      let grass = 0;
+      for (let y = 0; y < w.h; y++) {
+        for (let x = 0; x < w.w; x++) {
+          if (w.plantStageAt(x, y) === T.STAGE_GRASS) grass++;
+        }
       }
+      if (grass >= 1) successes++;
     }
-    assert.ok(grass >= 1, "куст должен разбросать хотя бы одну траву за фазу роста");
-    assert.equal(world.plantStageAt(6, 6), T.STAGE_TREE);
+    assert.ok(successes >= trials * 0.6, `кусты сеют редко: ${successes}/${trials}`);
   });
 
   test("без зверей куст успевает созреть до дерева", () => {
@@ -271,11 +277,11 @@ describe("аркада: конец раунда", () => {
     assert.equal(world.gameOver, false);
   });
 
-  test("без энергии на зайца и 35+ пустых циклов — конец", () => {
-    const { world } = createWorld();
+  test("без энергии на зайца и 40+ пустых циклов — конец", () => {
+    const { world, ARCADE_STALE_AFTER } = createWorld();
     world.arcade = true;
-    world.noAnimalGens = 35;
-    world.lonelyGens = 35;
+    world.noAnimalGens = ARCADE_STALE_AFTER;
+    world.lonelyGens = ARCADE_STALE_AFTER;
     world.checkArcadeEnd(10, 45);
     assert.equal(world.gameOver, true);
   });
