@@ -28,6 +28,24 @@
   const menuBg = $("menu-bg");
   const menuCtx = menuBg.getContext("2d");
 
+  function isMobileUi() {
+    return window.innerWidth <= 980;
+  }
+
+  function toolEmoji(label) {
+    const m = label.match(/^(\p{Extended_Pictographic}+)/u);
+    return m ? m[1] : label;
+  }
+
+  let layoutObserver = null;
+  function watchLayout() {
+    const stage = $("stage");
+    if (!stage || layoutObserver) return;
+    layoutObserver = new ResizeObserver(() => resize());
+    layoutObserver.observe(stage);
+    layoutObserver.observe($("screen-game"));
+  }
+
   function syncAudioUi() {
     const soundBtn = $("btn-sound");
     const musicBtn = $("btn-music");
@@ -61,7 +79,13 @@
     for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
     $(id).classList.remove("hidden");
     app.screen = id;
-    if (id === "screen-game") resize();
+    if (id === "screen-game") {
+      watchLayout();
+      requestAnimationFrame(() => {
+        resize();
+        renderTools();
+      });
+    }
   }
 
   function toast(text) {
@@ -250,7 +274,10 @@
       const cost = toolCost(t.id);
       const cantAfford = app.gameType === "arcade" && cost > 0 && app.energy < cost;
       b.className = "tool" + (app.tool === t.id ? " active" : "") + (cantAfford ? " disabled" : "");
-      b.innerHTML = t.label + (cost ? `<small>⚡${cost}</small>` : "");
+      const costHtml = cost ? `<small>⚡${cost}</small>` : "";
+      b.innerHTML = isMobileUi()
+        ? toolEmoji(t.label) + costHtml
+        : t.label + costHtml;
       b.title = LIFE_DATA.toolHelp[t.id] || "";
       b.onclick = () => {
         if (cantAfford) { toast("Не хватает энергии"); return; }
@@ -383,11 +410,10 @@
 
   function cellSize() {
     const stage = $("stage");
-    const pad = 4;
+    const pad = 8;
     const availW = Math.max(1, stage.clientWidth - pad);
     const availH = Math.max(1, stage.clientHeight - pad);
-    const minCell = window.innerWidth <= 980 ? 10 : 8;
-    return Math.max(minCell, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+    return Math.max(4, Math.floor(Math.min(availW / COLS, availH / ROWS)));
   }
 
   function dishRect(dish, s) {
@@ -597,16 +623,23 @@
     canvas.style.cursor = app.tool === "inspect" ? "help" : "crosshair";
 
     const cycleLabel = app.gameType === "arcade" ? "Циклы" : "Поколение";
+    const cycleIcon = app.gameType === "arcade" ? "⏱" : "🧬";
+    const stats = [
+      { icon: cycleIcon, label: cycleLabel, value: w.generation },
+      { icon: "🌱", label: "Трава", value: a.grass },
+      { icon: "🌿", label: "Кусты", value: a.bush },
+      { icon: "🌳", label: "Деревья", value: a.tree },
+      { icon: "🐰", label: "Зайцы", value: a.herbs },
+      { icon: "🦊", label: "Лисы", value: a.preds },
+      { icon: "🐻", label: "Медведи", value: a.bears }
+    ];
     const grid = $("stats-grid");
-    grid.innerHTML = `
-      <div><span>${cycleLabel}</span><strong>${w.generation}</strong></div>
-      <div><span>Трава</span><strong>${a.grass}</strong></div>
-      <div><span>Кусты</span><strong>${a.bush}</strong></div>
-      <div><span>Деревья</span><strong>${a.tree}</strong></div>
-      <div><span>Зайцы</span><strong>${a.herbs}</strong></div>
-      <div><span>Лисы</span><strong>${a.preds}</strong></div>
-      <div><span>Медведи</span><strong>${a.bears}</strong></div>
-    `;
+    grid.innerHTML = stats.map((s) => (
+      `<div class="stat-chip" title="${s.label}">`
+      + `<span class="stat-ico" aria-hidden="true">${s.icon}</span>`
+      + `<span class="stat-label">${s.label}</span>`
+      + `<strong>${s.value}</strong></div>`
+    )).join("");
 
     $("analytics").innerHTML = `
       <div class="meter">
@@ -921,7 +954,10 @@
       $("btn-play").click();
     }
   });
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", () => {
+    resize();
+    if (app.screen === "screen-game") renderTools();
+  });
 
   syncAudioUi();
   updateSpeedButton();
