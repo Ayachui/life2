@@ -4,7 +4,7 @@ const LIFE_DATA = {
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
   // major 1.0.0   — стабильный релиз (stage: "release")
   // stage: "alpha" | "beta" | "release"
-  gameVersion: { stage: "alpha", major: 0, minor: 6, patch: 3 },
+  gameVersion: { stage: "alpha", major: 0, minor: 6, patch: 4 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },

@@ -219,6 +219,7 @@
     const grid = $("tool-grid");
     grid.innerHTML = "";
     for (const t of LIFE_DATA.tools) {
+      if (app.gameType === "arcade" && (t.id === "water" || t.id === "wall")) continue;
       const b = document.createElement("button");
       const cost = toolCost(t.id);
       const cantAfford = app.gameType === "arcade" && cost > 0 && app.energy < cost;
@@ -247,13 +248,16 @@
   }
 
   function legend() {
-    const items = [
+    let items = [
       ["🌱", "трава"], ["🌿", "куст"], ["🌳", "дерево"],
       ["🐰", "зайцы"], ["🦊", "лисы"], ["🐻", "медведь"], ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"],
       ["ring:#ffd45c", "зоркий"], ["ring:#8ea0d8", "близорукий"],
       ["ring:#ff5d7a", "прожорливый"], ["ring:#3ee0a2", "экономный"],
       ["🐇", "крол-душегуб"]
     ];
+    if (app.gameType === "arcade") {
+      items = items.filter(([mark]) => mark !== "💧" && mark !== "🪨");
+    }
     $("legend").innerHTML = items.map(([mark, n]) => {
       if (mark.startsWith("ring:")) return `<span><i class="ring" style="border-color:${mark.slice(5)}"></i>${n}</span>`;
       return `<span>${mark} ${n}</span>`;

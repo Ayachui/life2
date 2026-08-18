@@ -129,6 +129,14 @@ class World {
     return Math.hypot(x - this.dish.cx, y - this.dish.cy) <= this.dish.r;
   }
 
+  /** В аркаде вода и камни внутри чашки не меняют симуляцию (только песочница). */
+  isWalkable(x, y) {
+    const t = this.get(x, y);
+    if (t === EMPTY) return true;
+    if (this.arcade && this.inDish(x, y) && (t === WATER || t === WALL)) return true;
+    return false;
+  }
+
   clone() {
     const w = new World(this.w, this.h);
     w.cells.set(this.cells);
@@ -325,7 +333,7 @@ class World {
     for (const [dx, dy] of dirs) {
       const nx = a.x + dx;
       const ny = a.y + dy;
-      if (this.get(nx, ny) === EMPTY) {
+      if (this.isWalkable(nx, ny)) {
         this.moveAgentTo(a, nx, ny);
         return true;
       }
@@ -344,7 +352,7 @@ class World {
       : (dx ? { x: a.x + Math.sign(dx), y: a.y } : null);
     if (alt && (!primary || alt.x !== primary.x || alt.y !== primary.y)) steps.push(alt);
     for (const step of steps) {
-      if (this.get(step.x, step.y) === EMPTY) {
+      if (this.isWalkable(step.x, step.y)) {
         this.moveAgentTo(a, step.x, step.y);
         return true;
       }
@@ -534,6 +542,9 @@ class World {
       if (this.get(x, y) !== EMPTY) return false;
       this.setPlant(x, y, STAGE_GRASS, 0);
       return true;
+    }
+    if (brush === "water" || brush === "wall") {
+      if (this.arcade) return false;
     }
     if (brush === "water") {
       this.clearPlant(x, y);
@@ -788,7 +799,7 @@ class World {
 
   trySpawnGrass(x, y, baseChance) {
     if (this.get(x, y) !== EMPTY) return false;
-    const wet = this.countType(x, y, WATER);
+    const wet = !this.arcade && this.countType(x, y, WATER);
     const boost = this.decayBoost(x, y);
     let p = baseChance + boost;
     if (wet) p += 0.03;

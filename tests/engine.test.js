@@ -356,6 +356,44 @@ describe("лес без зверей", () => {
   });
 });
 
+describe("аркада: вода и камень", () => {
+  test("нельзя ставить воду и камень", () => {
+    const { world } = createWorld();
+    world.arcade = true;
+    world.makeDish();
+    const cx = Math.floor(world.w / 2);
+    const cy = Math.floor(world.h / 2);
+    assert.equal(world.paint(cx, cy, "water"), false);
+    assert.equal(world.paint(cx, cy, "wall"), false);
+    assert.equal(world.get(cx, cy), 0);
+  });
+
+  test("вода в чашке не блокирует зверей", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.makeDish();
+    world.set(8, 8, T.WATER);
+    world.set(8, 9, T.HERB);
+    const herb = world.makeAgent(8, 9, T.HERB);
+    world.agents = [herb];
+    assert.ok(world.moveTowardTarget(herb, 8, 8));
+    assert.equal(herb.x, 8);
+    assert.equal(herb.y, 8);
+  });
+
+  test("в песочнице вода по-прежнему блокирует", () => {
+    const { world, T } = createWorld();
+    world.arcade = false;
+    world.set(8, 8, T.WATER);
+    world.set(8, 9, T.HERB);
+    const herb = world.makeAgent(8, 9, T.HERB);
+    world.agents = [herb];
+    assert.equal(world.moveTowardTarget(herb, 8, 8), false);
+    assert.equal(herb.x, 8);
+    assert.equal(herb.y, 9);
+  });
+});
+
 describe("isAlive", () => {
   test("медведь держит игру", () => {
     const { world, T } = createWorld();
