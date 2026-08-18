@@ -150,6 +150,7 @@ class World {
   get(x, y) { return this.inside(x, y) ? this.cells[this.idx(x, y)] : WALL; }
   set(x, y, v) { if (this.inside(x, y)) this.cells[this.idx(x, y)] = v; }
 
+  /** Буст к базовому шансу: base × (1 + 30% × цикл мира), не процентные пункты. */
   mutationMult() {
     return 1 + MUT_GEN_BOOST * this.generation;
   }

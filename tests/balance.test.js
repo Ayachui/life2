@@ -110,4 +110,30 @@ describe("баланс: мутации", () => {
     assert.ok(match);
     assert.equal(Number(match[1]), 0.02);
   });
+
+  test("буст мутации: 30% от базового шанса за каждый цикл мира", () => {
+    const { world } = createWorld();
+    world.generation = 0;
+    assert.equal(world.effectiveChance(0.02), 0.02);
+    world.generation = 1;
+    assert.ok(Math.abs(world.effectiveChance(0.02) - 0.026) < 1e-12);
+    world.generation = 10;
+    assert.ok(Math.abs(world.effectiveChance(0.02) - 0.08) < 1e-12);
+  });
+
+  test("буст не добавляет абсолютные процентные пункты", () => {
+    const { world } = createWorld();
+    world.generation = 5;
+    const base = 0.0025;
+    const effective = world.effectiveChance(base);
+    assert.ok(Math.abs(effective - base * (1 + 0.3 * 5)) < 1e-12);
+    assert.ok(effective < 0.01);
+  });
+
+  test("крол на 4-м цикле: 0.25% × 2.2 ≈ 0.55%", () => {
+    const { world } = createWorld();
+    world.generation = 4;
+    const effective = world.effectiveChance(0.0025);
+    assert.ok(Math.abs(effective - 0.0025 * 2.2) < 1e-12);
+  });
 });
