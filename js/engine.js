@@ -48,10 +48,8 @@ const KROL_DEATH_SPAWN = 3;
 const KROL_MOVES_PER_TICK = 3;
 const WOLF_SOLITUDE = 10;
 const ELK_POOP_INTERVAL = 5;
-const MUT_GEN_BOOST = 0.3;
-
 const SPECIES_CFG = {
-  [TRAIT.KOALA]: { energy: 12, drain: 0.28, thresh: 14, vision: 8, hue: 145, litter: 2, moveInterval: 1 },
+  [TRAIT.KOALA]: { energy: 12, drain: 0.28, thresh: 14, vision: 8, hue: 145, litter: 2, moveInterval: 2 },
   [TRAIT.COW]: { energy: 50, drain: 1.2, thresh: 22, vision: 6, hue: 52, litter: 1, moveInterval: 4 },
   [TRAIT.WOLF]: { energy: 14, drain: 0.52, thresh: 15, vision: 12, hue: 220, litter: 1, moveInterval: 1 },
   [TRAIT.ELK]: { energy: 25, drain: 0.32, thresh: 17, vision: 9, hue: 185, litter: 1, moveInterval: 1 },
@@ -150,13 +148,14 @@ class World {
   get(x, y) { return this.inside(x, y) ? this.cells[this.idx(x, y)] : WALL; }
   set(x, y, v) { if (this.inside(x, y)) this.cells[this.idx(x, y)] = v; }
 
-  /** Буст к базовому шансу: base × (1 + 30% × цикл мира), не процентные пункты. */
-  mutationMult() {
-    return 1 + MUT_GEN_BOOST * this.generation;
+  /** Множитель шанса мутации: 2^(поколение − 1). Поколение 1 — базовый шанс. */
+  mutationMultForGen(gen) {
+    const g = Math.max(1, gen || 1);
+    return Math.pow(2, g - 1);
   }
 
-  effectiveChance(base) {
-    return Math.min(1, base * this.mutationMult());
+  effectiveChance(base, gen) {
+    return Math.min(1, base * this.mutationMultForGen(gen));
   }
 
   clearPlant(x, y) {
@@ -1077,7 +1076,7 @@ class World {
       drain: parent ? parent.drain : d.drain,
       thresh: parent ? parent.thresh : d.thresh,
       trait: null,
-      gen: parent ? parent.gen + 1 : 0,
+      gen: parent ? parent.gen + 1 : 1,
       bornGen: null,
       cool: 0,
       dead: false,
@@ -1144,7 +1143,7 @@ class World {
       [TRAIT.COW, MUT_CHANCE.cow]
     ];
     for (const [trait, base] of order) {
-      acc += this.effectiveChance(base);
+      acc += this.effectiveChance(base, baby.gen);
       if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
     }
     return false;
@@ -1159,7 +1158,7 @@ class World {
       [TRAIT.ELK, MUT_CHANCE.elk]
     ];
     for (const [trait, base] of order) {
-      acc += this.effectiveChance(base);
+      acc += this.effectiveChance(base, baby.gen);
       if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
     }
     return false;
