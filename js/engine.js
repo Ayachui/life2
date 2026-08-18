@@ -32,11 +32,7 @@ const TRAIT = {
   KOALA: "коала",
   COW: "корова",
   WOLF: "волк",
-  ELK: "лось",
-  KEEN: "зоркий",
-  NEARSIGHTED: "близорукий",
-  GLUTTON: "прожорливый",
-  FRUGAL: "экономный"
+  ELK: "лось"
 };
 
 const MUT_CHANCE = {
@@ -128,7 +124,6 @@ class World {
     this.deaths = 0;
     this.mutations = 0;
     this.dish = null;
-    this.mutateRate = 0.18;
     this.fx = [];
     this.mutHerb = 0;
     this.mutPred = 0;
@@ -259,7 +254,6 @@ class World {
     w.decays = this.decays.map((d) => ({ ...d }));
     w.fertilizers = this.fertilizers.map((f) => ({ ...f }));
     w.dish = this.dish ? { ...this.dish } : null;
-    w.mutateRate = this.mutateRate;
     w.mutHerb = this.mutHerb;
     w.mutPred = this.mutPred;
     w.generation = this.generation;
@@ -470,9 +464,6 @@ class World {
     const d = Math.abs(prey.x - px) + Math.abs(prey.y - py);
     let score = d;
     if (prey.energy < prey.thresh) score -= 0.35;
-    if (prey.trait === TRAIT.NEARSIGHTED) score -= 0.25;
-    if (prey.trait === TRAIT.FRUGAL) score -= 0.15;
-    if (hunter.trait === TRAIT.GLUTTON) score -= 0.2;
     if (hunter.kind === BEAR && prey.kind === PRED) score -= 0.45;
     if (hunter.kind === BEAR && prey.energy < prey.thresh) score -= 0.2;
     if (isKrolDushegub(hunter) && prey.kind === PRED) score -= 0.15;
@@ -622,9 +613,7 @@ class World {
     return this.moveTowardTarget(a, tx, ty) || this.wanderAgent(a);
   }
 
-  wanderBiasChance(a) {
-    if (a.trait === TRAIT.GLUTTON) return 0.52;
-    if (a.trait === TRAIT.FRUGAL) return 0.22;
+  wanderBiasChance() {
     return 0.35;
   }
 
@@ -647,7 +636,7 @@ class World {
       }
     }
     if (!this.shouldMoveThisTick(a)) return;
-    if (Math.random() >= this.wanderBiasChance(a)) return;
+    if (Math.random() >= this.wanderBiasChance()) return;
     const dir = a.kind === HERB || isElk(a) ? this.seekHerb(a) : this.seekPred(a);
     const nx = a.x + dir.x;
     const ny = a.y + dir.y;
@@ -969,8 +958,7 @@ class World {
       vision: parent ? parent.vision : d.vision,
       drain: parent ? parent.drain : d.drain,
       thresh: parent ? parent.thresh : d.thresh,
-      trait: parent && parent.trait && !isSpecialSpecies(parent) ? parent.trait : null,
-      mutated: false,
+      trait: null,
       gen: parent ? parent.gen + 1 : 0,
       bornGen: null,
       cool: 0,
@@ -980,9 +968,6 @@ class World {
       movePhase: 0,
       stepsSincePoop: 0
     };
-    if (parent && isSpecialSpecies(parent)) {
-      agent.trait = null;
-    }
     return agent;
   }
 
@@ -997,7 +982,6 @@ class World {
     baby.hue = cfg.hue + Math.random() * 8;
     baby.moveInterval = cfg.moveInterval || 1;
     baby.movesPerTick = cfg.movesPerTick || 1;
-    baby.mutated = true;
     if (trait === TRAIT.KROL) baby.bornGen = this.generation;
     this.mutations++;
     if (baby.kind === HERB) this.mutHerb++;
@@ -1061,36 +1045,6 @@ class World {
       if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
     }
     return false;
-  }
-
-  applyMutation(baby, parent) {
-    if (isSpecialSpecies(baby)) return false;
-    const rate = Math.min(1, this.mutateRate * this.mutationMult());
-    if (Math.random() >= rate) return false;
-    const roll = Math.random();
-    if (roll < 0.34) {
-      const up = Math.random() < 0.55;
-      baby.vision = Math.max(4, Math.min(12, parent.vision + (up ? 2 : -2)));
-      baby.trait = up ? TRAIT.KEEN : TRAIT.NEARSIGHTED;
-      baby.hue = (parent.hue + (up ? 42 : -28) + 360) % 360;
-    } else if (roll < 0.67) {
-      baby.drain = Math.max(0.18, Math.min(0.85, parent.drain * 1.3));
-      baby.thresh = Math.max(8, parent.thresh - 1);
-      baby.trait = TRAIT.GLUTTON;
-      baby.hue = (parent.hue + 330) % 360;
-    } else {
-      baby.drain = Math.max(0.16, parent.drain * 0.7);
-      baby.trait = TRAIT.FRUGAL;
-      baby.hue = (parent.hue + 28) % 360;
-    }
-    baby.mutated = true;
-    this.mutations++;
-    if (baby.kind === HERB) this.mutHerb++;
-    else this.mutPred++;
-    const energy = this.grantMutationEnergy(baby.trait);
-    this.lastMutation = { kind: baby.kind, trait: baby.trait, gen: this.generation, energy };
-    this.chime("mutate");
-    return true;
   }
 
   agentAt(x, y) {
@@ -1494,13 +1448,8 @@ class World {
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
             baby.energy = a.energy;
             baby.cool = a.cool;
-            if (baby.kind === HERB) {
-              if (!this.tryHerbSpeciesMutation(baby, spot.x, spot.y)) this.applyMutation(baby, a);
-            } else if (baby.kind === PRED) {
-              if (!this.tryPredSpeciesMutation(baby, spot.x, spot.y)) this.applyMutation(baby, a);
-            } else {
-              this.applyMutation(baby, a);
-            }
+            if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y);
+            else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
             this.set(spot.x, spot.y, a.kind);
             babies.push(baby);
             this.births++;

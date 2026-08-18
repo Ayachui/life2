@@ -223,12 +223,12 @@ describe("энергия за эволюцию", () => {
   });
 });
 
-describe("энергия за мутации", () => {
+describe("энергия за мутации видов", () => {
   test("начисление по таблице", () => {
     const { world, LIFE_DATA } = createWorld();
     world.arcade = true;
-    assert.equal(world.grantMutationEnergy("зоркий"), LIFE_DATA.mutationEnergy["зоркий"]);
-    assert.equal(world.pendingEnergy, 8);
+    assert.equal(world.grantMutationEnergy("коала"), LIFE_DATA.mutationEnergy["коала"]);
+    assert.equal(world.pendingEnergy, 25);
     world.pendingEnergy = 0;
     assert.equal(world.grantMutationEnergy("крол-душегуб"), 40);
   });
@@ -236,7 +236,7 @@ describe("энергия за мутации", () => {
   test("без аркады мутации не дают ⚡", () => {
     const { world } = createWorld();
     world.arcade = false;
-    assert.equal(world.grantMutationEnergy("зоркий"), 0);
+    assert.equal(world.grantMutationEnergy("коала"), 0);
   });
 });
 

@@ -129,11 +129,35 @@
     return !$("krol-overlay").classList.contains("hidden");
   }
 
+  function agentIcon(a) {
+    const T = LIFE_TYPES;
+    if (a.kind === T.BEAR) return "🐻";
+    if (a.trait === "волк") return "🐺";
+    if (a.trait === "лось") return "🦌";
+    if (a.kind === T.PRED) return "🦊";
+    if (a.trait === "крол-душегуб") return "🐇";
+    if (a.trait === "коала") return "🐨";
+    if (a.trait === "корова") return "🐮";
+    return "🐰";
+  }
+
+  function agentLabel(a) {
+    const T = LIFE_TYPES;
+    if (a.kind === T.BEAR) return "Медведь";
+    if (a.trait === "волк") return "Волк";
+    if (a.trait === "лось") return "Лось";
+    if (a.kind === T.PRED) return "Лиса";
+    if (a.trait === "крол-душегуб") return "Крол-душегуб";
+    if (a.trait === "коала") return "Коала";
+    if (a.trait === "корова") return "Корова";
+    return "Заяц";
+  }
+
   function notifyMutation(energyGain) {
     const m = app.world?.lastMutation;
     if (!m) return;
     const bonus = energyBonusLabel(energyGain);
-    toast(`Новый характер: ${m.trait} (${m.kind === LIFE_TYPES.HERB ? "заяц" : "лиса"})${bonus}`);
+    toast(`Новый вид: ${m.trait}${bonus}`);
     app.mutToastAt = performance.now();
     if (app.world) app.world.lastMutation = null;
   }
@@ -158,7 +182,7 @@
     app.playing = false;
     $("btn-play").textContent = "▶ Старт";
 
-    const desc = LIFE_DATA.traitDesc["крол-душегуб"] || "охотится на лис";
+    const desc = LIFE_DATA.speciesHelp["крол-душегуб"] || "охотится на всех зверей";
     $("krol-overlay-desc").textContent = `${desc}. Живёт недолго, но приносит троих детёнышей.`;
     const bonusEl = $("krol-overlay-bonus");
     if (bonus) {
@@ -252,18 +276,14 @@
   function legend() {
     let items = [
       ["🌱", "трава"], ["🌿", "куст"], ["🌳", "дерево"],
-      ["🐰", "зайцы"], ["🦊", "лисы"], ["🐻", "медведь"], ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"],
-      ["ring:#ffd45c", "зоркий"], ["ring:#8ea0d8", "близорукий"],
-      ["ring:#ff5d7a", "прожорливый"], ["ring:#3ee0a2", "экономный"],
-      ["🐇", "крол-душегуб"]
+      ["🐰", "заяц"], ["🐨", "коала"], ["🐮", "корова"], ["🐇", "крол-душегуб"],
+      ["🦊", "лиса"], ["🐺", "волк"], ["🦌", "лось"], ["🐻", "медведь"],
+      ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"]
     ];
     if (app.gameType === "arcade") {
       items = items.filter(([mark]) => mark !== "💧" && mark !== "🪨");
     }
-    $("legend").innerHTML = items.map(([mark, n]) => {
-      if (mark.startsWith("ring:")) return `<span><i class="ring" style="border-color:${mark.slice(5)}"></i>${n}</span>`;
-      return `<span>${mark} ${n}</span>`;
-    }).join("");
+    $("legend").innerHTML = items.map(([mark, n]) => `<span>${mark} ${n}</span>`).join("");
   }
 
   function setupWorld(gameType, difficulty) {
@@ -485,15 +505,7 @@
     for (const a of w.agents) {
       if (a.dead) continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
-      if (a.trait) drawTraitRing(a.x, a.y, s, a.trait);
-      const icon = a.kind === T.BEAR ? "🐻"
-        : a.trait === "волк" ? "🐺"
-        : a.trait === "лось" ? "🦌"
-        : a.kind === T.PRED ? "🦊"
-        : a.trait === "крол-душегуб" ? "🐇"
-        : a.trait === "коала" ? "🐨"
-        : a.trait === "корова" ? "🐮"
-        : "🐰";
+      const icon = agentIcon(a);
       const scale = a.trait === "крол-душегуб" ? 1.08
         : a.trait === "корова" ? 1.05
         : a.trait === "лось" ? 1.02
@@ -552,21 +564,6 @@
     ctx.restore();
   }
 
-  function drawTraitRing(x, y, s, trait) {
-    const color = LIFE_DATA.traitRing[trait];
-    if (!color) return;
-    const cx = (x + 0.5) * s;
-    const cy = (y + 0.5) * s;
-    ctx.beginPath();
-    ctx.arc(cx, cy, s * 0.48, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = trait === "крол-душегуб" ? Math.max(3, s * 0.2) : Math.max(2.2, s * 0.16);
-    ctx.shadowColor = color;
-    ctx.shadowBlur = trait === "крол-душегуб" ? 16 : 10;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-
   function updateStats() {
     const w = app.world;
     if (!w) return;
@@ -619,28 +616,21 @@
     const T = LIFE_TYPES;
     const a = w.agentAt(x, y);
     if (a) {
-      const who = a.kind === T.BEAR ? "Медведь"
-        : a.trait === "волк" ? "Волк"
-        : a.trait === "лось" ? "Лось"
-        : a.kind === T.PRED ? "Лиса"
-        : a.trait === "крол-душегуб" ? "КРОЛ-ДУШЕГУБ"
-        : a.trait === "коала" ? "Коала"
-        : a.trait === "корова" ? "Корова"
-        : "Заяц";
+      const who = agentLabel(a);
       const sat = Math.round(Math.min(1, a.energy / Math.max(0.2, a.thresh)) * 100);
       const mood = a.energy >= a.thresh ? "сыт" : "голоден";
-      const trait = a.trait ? `${a.trait}` : "обычный";
-      let traitNote = a.trait && LIFE_DATA.traitHelp[a.trait] ? `<br><span class="note">${LIFE_DATA.traitHelp[a.trait]}</span>` : "";
+      let note = a.trait && LIFE_DATA.speciesHelp[a.trait]
+        ? `<br><span class="note">${LIFE_DATA.speciesHelp[a.trait]}</span>` : "";
       if (a.trait === "крол-душегуб" && a.bornGen != null) {
         const left = Math.max(0, KROL_LIFESPAN - (w.generation - a.bornGen));
-        traitNote += `<br><span class="note">Осталось ~${left} циклов</span>`;
+        note += `<br><span class="note">Осталось ~${left} циклов</span>`;
       }
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
         : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
         : a.trait === "крол-душегуб" ? `быстрый (×3), восприятие ${a.vision} кл.`
         : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
         : `восприятие ${a.vision} кл.`;
-      return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${trait} · ${moveNote} · поколение ${a.gen}${traitNote}`;
+      return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}`;
     }
     const t = w.get(x, y);
     if (t === T.PLANT) {

@@ -39,16 +39,16 @@ describe("баланс: пассивный доход ⚡", () => {
     assert.ok(ticks >= 30, "эволюция занимает заметное время");
   });
 
-  test("мутация слабее зайца, крол — почти зайц", () => {
+  test("мутация вида слабее зайца, крол — почти зайц", () => {
     const { LIFE_DATA } = createWorld();
     const herb = toolCost(LIFE_DATA, "herb");
     const avg = (
-      LIFE_DATA.mutationEnergy["зоркий"] +
-      LIFE_DATA.mutationEnergy["близорукий"] +
-      LIFE_DATA.mutationEnergy["прожорливый"] +
-      LIFE_DATA.mutationEnergy["экономный"]
+      LIFE_DATA.mutationEnergy["коала"] +
+      LIFE_DATA.mutationEnergy["корова"] +
+      LIFE_DATA.mutationEnergy["волк"] +
+      LIFE_DATA.mutationEnergy["лось"]
     ) / 4;
-    assert.ok(avg < herb * 0.25);
+    assert.ok(avg < herb * 0.75);
     assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] >= herb * 0.75);
     assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] <= herb);
   });
@@ -104,8 +104,10 @@ describe("баланс: мутации", () => {
     assert.equal(Number(match[1]), 0.005);
   });
 
-  test("базовый шанс мутации умеренный", () => {
-    const { world } = createWorld();
-    assert.ok(world.mutateRate >= 0.1 && world.mutateRate <= 0.25);
+  test("базовый шанс вида при рождении умеренный", () => {
+    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
+    const match = engineSrc.match(/koala:\s*([\d.]+)/);
+    assert.ok(match);
+    assert.equal(Number(match[1]), 0.02);
   });
 });

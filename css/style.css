@@ -224,11 +224,6 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   border-radius: 50%;
   margin-right: 4px;
 }
-.legend i.ring {
-  background: transparent;
-  border: 2px solid #fff;
-  box-sizing: border-box;
-}
 
 .mission-card {
   background: rgba(255,255,255,0.04);
