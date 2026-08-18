@@ -226,18 +226,24 @@ class World {
   makeDish() {
     const cx = (this.w - 1) / 2;
     const cy = (this.h - 1) / 2;
-    const r = Math.min(this.w, this.h) / 2 - 1.2;
-    this.dish = { cx, cy, r };
+    const half = Math.floor(Math.min(this.w, this.h) / 2) - 1;
+    this.dish = { cx, cy, half, square: true };
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
-        if (Math.hypot(x - cx, y - cy) > r) this.set(x, y, WALL);
+        if (Math.abs(x - cx) > half || Math.abs(y - cy) > half) {
+          this.set(x, y, WALL);
+        }
       }
     }
   }
 
   inDish(x, y) {
     if (!this.dish) return this.inside(x, y);
-    return Math.hypot(x - this.dish.cx, y - this.dish.cy) <= this.dish.r;
+    const d = this.dish;
+    if (d.square) {
+      return Math.abs(x - d.cx) <= d.half && Math.abs(y - d.cy) <= d.half;
+    }
+    return Math.hypot(x - d.cx, y - d.cy) <= d.r;
   }
 
   isWalkable(x, y) {

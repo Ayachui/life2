@@ -1,6 +1,6 @@
 (() => {
-  const COLS = 72;
-  const ROWS = 52;
+  const COLS = 48;
+  const ROWS = 48;
   const TUTORIAL_KEY = "life-tutorial-seen-v3";
 
   const $ = (id) => document.getElementById(id);
@@ -383,7 +383,33 @@
 
   function cellSize() {
     const stage = $("stage");
-    return Math.max(8, Math.floor(Math.min(stage.clientWidth / COLS, stage.clientHeight / ROWS)));
+    const pad = 4;
+    const availW = Math.max(1, stage.clientWidth - pad);
+    const availH = Math.max(1, stage.clientHeight - pad);
+    const minCell = window.innerWidth <= 980 ? 10 : 8;
+    return Math.max(minCell, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  }
+
+  function dishRect(dish, s) {
+    const side = dish.half * 2 + 1;
+    return {
+      x: (dish.cx - dish.half) * s,
+      y: (dish.cy - dish.half) * s,
+      w: side * s,
+      h: side * s,
+      radius: Math.min(s * 0.65, 14)
+    };
+  }
+
+  function fillRoundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
   }
 
   function resize() {
@@ -475,8 +501,8 @@
     ctx.fillRect(0, 0, COLS * s, ROWS * s);
 
     if (w.dish) {
-      ctx.beginPath();
-      ctx.arc((w.dish.cx + 0.5) * s, (w.dish.cy + 0.5) * s, w.dish.r * s, 0, Math.PI * 2);
+      const dr = dishRect(w.dish, s);
+      fillRoundRect(dr.x, dr.y, dr.w, dr.h, dr.radius);
       ctx.fillStyle = "#0d2430";
       ctx.fill();
     }
@@ -520,10 +546,10 @@
     }
 
     if (w.dish) {
-      ctx.beginPath();
-      ctx.arc((w.dish.cx + 0.5) * s, (w.dish.cy + 0.5) * s, w.dish.r * s, 0, Math.PI * 2);
+      const dr = dishRect(w.dish, s);
+      fillRoundRect(dr.x, dr.y, dr.w, dr.h, dr.radius);
       ctx.strokeStyle = "rgba(180, 230, 255, 0.35)";
-      ctx.lineWidth = 6;
+      ctx.lineWidth = Math.max(3, s * 0.14);
       ctx.stroke();
     }
 

@@ -458,6 +458,19 @@ describe("аркада: вода и камень", () => {
   });
 });
 
+describe("квадратная чашка", () => {
+  test("inDish по углам", () => {
+    const { world } = createWorld(48, 48);
+    world.makeDish();
+    const d = world.dish;
+    assert.equal(d.square, true);
+    assert.ok(world.inDish(d.cx, d.cy));
+    assert.ok(world.inDish(d.cx - d.half, d.cy - d.half));
+    assert.ok(world.inDish(d.cx + d.half, d.cy + d.half));
+    assert.equal(world.inDish(d.cx - d.half - 1, d.cy), false);
+  });
+});
+
 describe("isAlive", () => {
   test("медведь держит игру", () => {
     const { world, T } = createWorld();
