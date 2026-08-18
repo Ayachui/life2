@@ -349,6 +349,46 @@ describe("аркада: конец раунда", () => {
 });
 
 describe("крол-душегуб", () => {
+  test("охотится даже когда сыт", () => {
+    const { world, T } = createWorld();
+    world.set(2, 2, T.HERB);
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 50;
+    krol.thresh = 12;
+    world.set(3, 2, T.HERB);
+    const prey = world.makeAgent(3, 2, T.HERB);
+    prey.trait = "коала";
+    world.agents = [krol, prey];
+    world.feedKrolDushegub(krol);
+    assert.equal(prey.dead, true);
+  });
+
+  test("ест растения если нет добычи", () => {
+    const { world, T } = createWorld();
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 5;
+    krol.thresh = 12;
+    world.agents = [krol];
+    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.feedKrolDushegub(krol);
+    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+  });
+
+  test("может съесть волка", () => {
+    const { world, T } = createWorld();
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 20;
+    world.set(3, 2, T.PRED);
+    const wolf = world.makeAgent(3, 2, T.PRED);
+    wolf.trait = "волк";
+    world.agents = [krol, wolf];
+    world.feedKrolDushegub(krol);
+    assert.equal(wolf.dead, true);
+  });
+
   test("умирает по таймеру", () => {
     const { world, T, KROL_LIFESPAN } = createWorld();
     world.set(2, 2, T.HERB);

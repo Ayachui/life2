@@ -123,8 +123,20 @@ describe("аркада: устойчивость после цепочки", () 
     world.sustainedChain = true;
     world.lonelyGens = ARCADE_LONELY_MAX;
     world.noAnimalGens = ARCADE_LONELY_MAX;
+    world.noHerbGens = ARCADE_LONELY_MAX;
     world.generation = ARCADE_LONELY_MAX + 1;
     world.checkArcadeEnd(6, 45);
     assert.equal(world.gameOver, true);
+  });
+
+  test("только лес без зайцев завершает игру по таймеру", () => {
+    const { world, T, ARCADE_LONELY_MAX } = createWorld();
+    world.arcade = true;
+    world.sustainedChain = true;
+    world.setPlant(5, 5, T.STAGE_GRASS, 0);
+    world.noHerbGens = ARCADE_LONELY_MAX;
+    world.checkArcadeEnd(1000, 45);
+    assert.equal(world.gameOver, true);
+    assert.equal(world.gameOverReason, "no_chain");
   });
 });

@@ -133,6 +133,7 @@ class World {
     this.gameOverReason = null;
     this.arcade = false;
     this.noAnimalGens = 0;
+    this.noHerbGens = 0;
     this.lonelyGens = 0;
     this.herbStreak = 0;
     this.sustainedChain = false;
@@ -202,14 +203,16 @@ class World {
     if (this.get(x, y) !== PLANT) return null;
     const stage = this.plantStageAt(x, y);
     if (stage === STAGE_GRASS || stage === STAGE_BUSH) return { x, y, stage };
-    if (stage === STAGE_TREE && (isCow(a) || isElk(a))) return { x, y, stage };
+    if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) return { x, y, stage };
     return null;
   }
 
   startEating(a, meal) {
     a.eating = { x: meal.x, y: meal.y };
     if (meal.stage === STAGE_TREE && this.plantBites[this.idx(meal.x, meal.y)] <= 0) {
-      const bites = isCow(a) ? PLANT_CFG.treeBitesCow : PLANT_CFG.treeBitesElk;
+      const bites = isCow(a) ? PLANT_CFG.treeBitesCow
+        : isKrolDushegub(a) ? 4
+        : PLANT_CFG.treeBitesElk;
       this.plantBites[this.idx(meal.x, meal.y)] = bites;
     }
     this.eatPlant(a, meal);
@@ -261,6 +264,7 @@ class World {
     w.gameOverReason = this.gameOverReason;
     w.arcade = this.arcade;
     w.noAnimalGens = this.noAnimalGens;
+    w.noHerbGens = this.noHerbGens;
     w.lonelyGens = this.lonelyGens;
     w.herbStreak = this.herbStreak;
     w.sustainedChain = this.sustainedChain;
@@ -275,16 +279,20 @@ class World {
 
   tickAnimalMetrics() {
     const herbs = this.live(HERB).length;
-    if (this.hasAnimals()) {
-      if (herbs > 0) {
+    if (herbs > 0) {
+      this.noHerbGens = 0;
+      if (this.hasAnimals()) {
         this.herbStreak++;
         if (this.herbStreak >= CHAIN_SUSTAIN_GENS) this.sustainedChain = true;
-      } else {
-        this.herbStreak = 0;
       }
+    } else {
+      this.noHerbGens++;
+      this.herbStreak = 0;
+    }
+
+    if (this.hasAnimals()) {
       this.noAnimalGens = 0;
     } else {
-      this.herbStreak = 0;
       this.noAnimalGens++;
       this.lonelyGens++;
     }
@@ -297,8 +305,15 @@ class World {
 
   checkArcadeEnd(energy, herbCost) {
     if (!this.arcade || this.gameOver) return;
-    if (this.hasAnimals()) return;
     const broke = energy < herbCost;
+
+    if (this.noHerbGens >= ARCADE_LONELY_MAX) {
+      this.gameOver = true;
+      this.gameOverReason = "no_chain";
+      return;
+    }
+
+    if (this.hasAnimals()) return;
 
     if (!this.isAlive()) {
       if (this.lonelyGens >= ARCADE_LONELY_MAX) {
@@ -313,7 +328,13 @@ class World {
       }
     }
 
-    if (this.sustainedChain) return;
+    if (this.sustainedChain) {
+      if (broke && this.noAnimalGens >= ARCADE_STALE_AFTER) {
+        this.gameOver = true;
+        this.gameOverReason = "no_chain";
+      }
+      return;
+    }
 
     if (this.lonelyGens >= ARCADE_LONELY_MAX) {
       this.gameOver = true;
@@ -388,7 +409,7 @@ class World {
           const stage = this.plantStageAt(nx, ny);
           if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
             food.push({ x: nx, y: ny, stage, dist: cheb, man });
-          } else if (stage === STAGE_TREE && (isCow(agent) || isElk(agent))) {
+          } else if (stage === STAGE_TREE && (isCow(agent) || isElk(agent) || isKrolDushegub(agent))) {
             food.push({ x: nx, y: ny, stage, dist: cheb, man });
           }
         }
@@ -435,7 +456,7 @@ class World {
     let bestGrass = null, bestGrassD = 99;
     let bestBush = null, bestBushD = 99;
     let bestTree = null, bestTreeD = 99;
-    const canEatTree = eater && (isCow(eater) || isElk(eater));
+    const canEatTree = eater && (isCow(eater) || isElk(eater) || isKrolDushegub(eater));
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
         if (!dx && !dy) continue;
@@ -467,6 +488,9 @@ class World {
     if (hunter.kind === BEAR && prey.kind === PRED) score -= 0.45;
     if (hunter.kind === BEAR && prey.energy < prey.thresh) score -= 0.2;
     if (isKrolDushegub(hunter) && prey.kind === PRED) score -= 0.15;
+    if (isKrolDushegub(hunter) && prey.kind === BEAR) score -= 0.5;
+    if (isKrolDushegub(hunter) && (isWolf(prey) || isElk(prey))) score -= 0.35;
+    if (isKrolDushegub(hunter) && (isCow(prey) || isKoala(prey))) score -= 0.2;
     if (isWolf(hunter) && isCow(prey)) score -= 0.3;
     if (isWolf(hunter) && prey.kind === HERB) score -= 0.1;
     return score;
@@ -624,6 +648,10 @@ class World {
   }
 
   stepSated(a) {
+    if (isKrolDushegub(a)) {
+      this.feedKrolDushegub(a);
+      return;
+    }
     if (a.kind === BEAR) {
       if (Math.random() < 0.15) this.wanderAgent(a);
       return;
@@ -692,37 +720,32 @@ class World {
     return this.pounceVictim(a, spot, gain);
   }
 
-  feedHungryHerb(a) {
-    const aware = this.perceive(a);
-    const moves = isKrolDushegub(a) ? KROL_MOVES_PER_TICK : 1;
+  krolHuntGain(victim) {
+    if (!victim) return 7;
+    if (victim.kind === BEAR) return 14;
+    if (isWolf(victim) || isElk(victim)) return 10;
+    if (isCow(victim)) return 12;
+    if (isKoala(victim)) return 7;
+    if (victim.kind === PRED) return 8.5;
+    return 7;
+  }
 
-    for (let m = 0; m < moves; m++) {
-      if (!this.shouldMoveThisTick(a) && !isKrolDushegub(a)) break;
+  feedKrolDushegub(a) {
+    for (let m = 0; m < KROL_MOVES_PER_TICK; m++) {
+      const aware = this.perceive(a);
 
-      if (isKrolDushegub(a)) {
+      if (aware.prey.length) {
         if (aware.touchPrey) {
-          const gain = aware.touchPrey.agent.kind === BEAR ? 14
-            : aware.touchPrey.agent.kind === PRED ? 8.5 : 7;
+          const gain = this.krolHuntGain(aware.touchPrey.agent);
           if (this.pounceVictim(a, aware.touchPrey, gain)) return;
         }
-        const preySpot = aware.prey[0];
-        if (preySpot) {
-          this.nudgeToward(a, preySpot.x, preySpot.y);
-          const adj = this.findNearestAgent(a.x, a.y, 1, [HERB, PRED, BEAR], a, "touch");
-          if (adj) {
-            const victim = this.agentAt(adj.x, adj.y);
-            const gain = victim?.kind === BEAR ? 14 : victim?.kind === PRED ? 8.5 : 7;
-            if (this.pounceVictim(a, adj, gain)) return;
-          }
-          continue;
+        const target = aware.prey[0];
+        this.nudgeToward(a, target.x, target.y);
+        const adj = this.findNearestAgent(a.x, a.y, 1, [HERB, PRED, BEAR], a, "touch");
+        if (adj) {
+          const victim = this.agentAt(adj.x, adj.y);
+          if (this.pounceVictim(a, adj, this.krolHuntGain(victim))) return;
         }
-        this.wanderAgent(a);
-        continue;
-      }
-
-      if (aware.threats.length && (aware.touchThreat || aware.deadEnd)) {
-        const t = aware.threats[0];
-        this.fleeFrom(a, t.x, t.y);
         continue;
       }
 
@@ -738,9 +761,9 @@ class World {
         return;
       }
 
-      const target = aware.food[0];
-      if (target) {
-        this.nudgeToward(a, target.x, target.y);
+      const plant = aware.food[0];
+      if (plant) {
+        this.nudgeToward(a, plant.x, plant.y);
         const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
         if (after) this.startEating(a, after);
         return;
@@ -748,6 +771,43 @@ class World {
 
       this.wanderAgent(a);
     }
+  }
+
+  feedHungryHerb(a) {
+    if (isKrolDushegub(a)) {
+      this.feedKrolDushegub(a);
+      return;
+    }
+
+    const aware = this.perceive(a);
+
+    if (aware.threats.length && (aware.touchThreat || aware.deadEnd)) {
+      const t = aware.threats[0];
+      this.fleeFrom(a, t.x, t.y);
+      return;
+    }
+
+    const continuing = this.mealFromEating(a);
+    if (continuing) {
+      this.eatPlant(a, continuing);
+      return;
+    }
+    if (a.eating) a.eating = null;
+
+    if (aware.touchFood) {
+      this.startEating(a, aware.touchFood);
+      return;
+    }
+
+    const target = aware.food[0];
+    if (target) {
+      this.nudgeToward(a, target.x, target.y);
+      const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
+      if (after) this.startEating(a, after);
+      return;
+    }
+
+    this.wanderAgent(a);
   }
 
   feedHungryPred(a) {
@@ -1304,9 +1364,9 @@ class World {
         a.eating = null;
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
-    } else if (stage === STAGE_TREE && (isCow(a) || isElk(a))) {
+    } else if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) {
       this.plantBites[i]--;
-      a.energy += PLANT_CFG.treeEnergyPerBite;
+      a.energy += PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         this.spawnGrassAt(meal.x, meal.y);
@@ -1412,9 +1472,11 @@ class World {
         continue;
       }
 
-      const hungry = a.energy < a.thresh;
+      const hungry = isKrolDushegub(a) || a.energy < a.thresh;
 
-      if (a.kind === HERB && hungry) {
+      if (isKrolDushegub(a)) {
+        this.feedKrolDushegub(a);
+      } else if (a.kind === HERB && hungry) {
         this.feedHungryHerb(a);
       } else if (a.kind === PRED && hungry) {
         this.feedHungryPred(a);
@@ -1427,7 +1489,7 @@ class World {
 
       if (a.dead) continue;
 
-      if (a.kind !== BEAR && !isElk(a) && a.energy >= a.thresh && a.cool <= 0) {
+      if (a.kind !== BEAR && !isElk(a) && !isKrolDushegub(a) && a.energy >= a.thresh && a.cool <= 0) {
         let breedChance = 1;
         if (a.kind === HERB && c.herbs > 0) {
           const edible = c.grass + c.bush * 0.6;
