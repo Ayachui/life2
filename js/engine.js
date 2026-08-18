@@ -36,7 +36,7 @@ const TRAIT = {
 };
 
 const MUT_CHANCE = {
-  krol: 0.005,
+  krol: 0.0025,
   koala: 0.02,
   cow: 0.01,
   wolf: 0.02,

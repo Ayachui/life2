@@ -97,11 +97,11 @@ describe("баланс: скорость экосистемы", () => {
 });
 
 describe("баланс: мутации", () => {
-  test("шанс крола 0.5%", () => {
+  test("шанс крола 0.25%", () => {
     const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
     const match = engineSrc.match(/krol:\s*([\d.]+)/);
     assert.ok(match);
-    assert.equal(Number(match[1]), 0.005);
+    assert.equal(Number(match[1]), 0.0025);
   });
 
   test("базовый шанс вида при рождении умеренный", () => {
