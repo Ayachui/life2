@@ -581,17 +581,25 @@
       if (a.dead) continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       const icon = agentIcon(a);
-      const scale = a.trait === "крол-душегуб" ? 1.08
-        : a.trait === "корова" ? 1.05
+      if (a.trait === "крол-душегуб") {
+        drawEmoji(icon, a.x + 1, a.y + 1, s, 0.45 + 0.55 * sat, 1.9);
+        continue;
+      }
+      const scale = a.trait === "корова" ? 1.05
         : a.trait === "лось" ? 1.02
         : 0.88 + 0.1 * sat;
       drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
     }
 
     if (app.inspect) {
+      const inspected = w.agentAt(app.inspect.x, app.inspect.y);
       ctx.strokeStyle = "#7dffc2";
       ctx.lineWidth = 2;
-      ctx.strokeRect(app.inspect.x * s + 1, app.inspect.y * s + 1, s - 2, s - 2);
+      if (inspected?.trait === "крол-душегуб") {
+        ctx.strokeRect(inspected.x * s + 1, inspected.y * s + 1, s * 2 - 2, s * 2 - 2);
+      } else {
+        ctx.strokeRect(app.inspect.x * s + 1, app.inspect.y * s + 1, s - 2, s - 2);
+      }
     }
 
     if (w.dish) {
@@ -715,7 +723,7 @@
       }
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
         : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
-        : a.trait === "крол-душегуб" ? `быстрый (×3), восприятие ${a.vision} кл.`
+        : a.trait === "крол-душегуб" ? `2×2 клетки, жрёт всё вокруг за раз, восприятие ${a.vision} кл.`
         : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
         : `восприятие ${a.vision} кл.`;
       return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}`;

@@ -30,4 +30,11 @@ function createWorld(w = 24, h = 24) {
   };
 }
 
-module.exports = { loadEngine, createWorld };
+function placeKrol(world, x, y, T) {
+  const krol = world.makeAgent(x, y, T.HERB);
+  krol.trait = "крол-душегуб";
+  world.occupyAgentCells(krol);
+  return krol;
+}
+
+module.exports = { loadEngine, createWorld, placeKrol };

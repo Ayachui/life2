@@ -46,6 +46,7 @@ const MUT_CHANCE = {
 const KROL_LIFESPAN = 15;
 const KROL_DEATH_SPAWN = 3;
 const KROL_MOVES_PER_TICK = 3;
+const KROL_SIZE = 2;
 const WOLF_SOLITUDE = 10;
 const ELK_POOP_INTERVAL = 5;
 const SPECIES_CFG = {
@@ -69,6 +70,26 @@ function isTrait(a, t) {
 
 function isKrolDushegub(a) {
   return isTrait(a, TRAIT.KROL);
+}
+
+function krolFootprintAt(x, y) {
+  return [
+    { x, y },
+    { x: x + 1, y },
+    { x, y: y + 1 },
+    { x: x + 1, y: y + 1 }
+  ];
+}
+
+function agentFootprint(a) {
+  if (isKrolDushegub(a)) return krolFootprintAt(a.x, a.y);
+  return [{ x: a.x, y: a.y }];
+}
+
+function agentOccupies(a, x, y) {
+  if (!a) return false;
+  if (isKrolDushegub(a)) return x >= a.x && x <= a.x + 1 && y >= a.y && y <= a.y + 1;
+  return a.x === x && a.y === y;
 }
 
 function isKoala(a) {
@@ -156,6 +177,103 @@ class World {
 
   effectiveChance(base, gen) {
     return Math.min(1, base * this.mutationMultForGen(gen));
+  }
+
+  agentAnchor(a) {
+    if (isKrolDushegub(a)) return { x: a.x + 0.5, y: a.y + 0.5 };
+    return { x: a.x, y: a.y };
+  }
+
+  clearAgentCells(a) {
+    for (const c of agentFootprint(a)) {
+      if (this.get(c.x, c.y) === a.kind) this.set(c.x, c.y, EMPTY);
+    }
+  }
+
+  occupyAgentCells(a) {
+    for (const c of agentFootprint(a)) {
+      if (this.get(c.x, c.y) === PLANT) this.clearPlant(c.x, c.y);
+      this.set(c.x, c.y, a.kind);
+    }
+  }
+
+  canPlaceKrolAt(x, y, ignoreAgent = null) {
+    for (const c of krolFootprintAt(x, y)) {
+      if (!this.inside(c.x, c.y)) return false;
+      if (this.get(c.x, c.y) !== EMPTY) return false;
+      for (const o of this.agents) {
+        if (o.dead || o === ignoreAgent) continue;
+        if (agentOccupies(o, c.x, c.y)) return false;
+      }
+    }
+    return true;
+  }
+
+  canAgentMoveTo(a, x, y) {
+    if (isKrolDushegub(a)) {
+      for (const c of krolFootprintAt(x, y)) {
+        if (!this.inside(c.x, c.y)) return false;
+        const t = this.get(c.x, c.y);
+        if (t !== EMPTY && !agentOccupies(a, c.x, c.y)) {
+          if (!(this.arcade && this.inDish(c.x, c.y) && (t === WATER || t === WALL))) return false;
+        }
+        const other = this.agentAt(c.x, c.y);
+        if (other && other !== a) return false;
+      }
+      return true;
+    }
+    if (!this.isWalkable(x, y)) return false;
+    const other = this.agentAt(x, y);
+    return !other || other === a;
+  }
+
+  krolEatRingCells(a) {
+    const cells = [];
+    for (let dy = -1; dy <= KROL_SIZE; dy++) {
+      for (let dx = -1; dx <= KROL_SIZE; dx++) {
+        if (dx >= 0 && dx < KROL_SIZE && dy >= 0 && dy < KROL_SIZE) continue;
+        const cx = a.x + dx;
+        const cy = a.y + dy;
+        if (this.inside(cx, cy)) cells.push({ x: cx, y: cy });
+      }
+    }
+    return cells;
+  }
+
+  plantEnergyRemaining(x, y) {
+    const i = this.idx(x, y);
+    const stage = this.plantStage[i];
+    const bites = this.plantBites[i];
+    if (stage === STAGE_GRASS) return (bites / PLANT_CFG.grassBites) * PLANT_CFG.grassEnergy;
+    if (stage === STAGE_BUSH) return bites * PLANT_CFG.bushEnergyPerBite;
+    if (stage === STAGE_TREE) return bites * PLANT_CFG.treeEnergyPerBite * 1.2;
+    return 0;
+  }
+
+  krolDevourRing(a) {
+    const ring = this.krolEatRingCells(a);
+    let ate = false;
+
+    const victims = [];
+    for (const o of this.agents) {
+      if (o.dead || o === a) continue;
+      if (ring.some((c) => agentOccupies(o, c.x, c.y)) && this.canHunt(a, o)) victims.push(o);
+    }
+    for (const victim of victims) {
+      this.killAgent(victim, a, this.krolHuntGain(victim));
+      ate = true;
+    }
+
+    for (const c of ring) {
+      if (this.get(c.x, c.y) !== PLANT) continue;
+      a.energy += this.plantEnergyRemaining(c.x, c.y);
+      this.clearPlant(c.x, c.y);
+      this.spark(c.x, c.y, "#ffc14d");
+      ate = true;
+    }
+
+    if (ate) this.chime(victims.length ? "krol_hunt" : "eat_grass");
+    return ate;
   }
 
   clearPlant(x, y) {
@@ -395,8 +513,9 @@ class World {
 
   perceive(agent) {
     const range = agent.vision || 7;
-    const px = agent.x;
-    const py = agent.y;
+    const anchor = this.agentAnchor(agent);
+    const px = anchor.x;
+    const py = anchor.y;
     const food = [];
     const prey = [];
     const threats = [];
@@ -426,9 +545,10 @@ class World {
 
     for (const o of this.agents) {
       if (o.dead || o === agent) continue;
-      const man = this.distMan(px, py, o.x, o.y);
-      const cheb = this.distCheb(px, py, o.x, o.y);
-      if (man > range) continue;
+      const oAnchor = this.agentAnchor(o);
+      const man = this.distMan(px, py, oAnchor.x, oAnchor.y);
+      const cheb = this.distCheb(px, py, oAnchor.x, oAnchor.y);
+      if (man > range + (isKrolDushegub(o) ? 1 : 0)) continue;
 
       if (this.canHunt(agent, o) && cheb > 0) {
         prey.push({ agent: o, x: o.x, y: o.y, dist: cheb, man, hungry: o.energy < o.thresh });
@@ -442,9 +562,10 @@ class World {
     prey.sort((a, b) => this.preyPriority(agent, a.agent, px, py) - this.preyPriority(agent, b.agent, px, py));
     threats.sort((a, b) => a.man - b.man);
 
-    const touchFood = food.find((f) => f.dist <= 1);
-    const touchPrey = prey.find((p) => p.dist <= 1);
-    const touchThreat = threats.find((t) => t.dist <= 1);
+    const touchDist = isKrolDushegub(agent) ? 1.5 : 1;
+    const touchFood = food.find((f) => f.dist <= touchDist);
+    const touchPrey = prey.find((p) => p.dist <= touchDist);
+    const touchThreat = threats.find((t) => t.dist <= touchDist);
     const deadEnd = exits.length <= 2;
 
     return { food, prey, threats, exits, touchFood, touchPrey, touchThreat, deadEnd, range };
@@ -587,10 +708,10 @@ class World {
   }
 
   moveAgentTo(a, x, y) {
-    this.set(a.x, a.y, EMPTY);
+    this.clearAgentCells(a);
     a.x = x;
     a.y = y;
-    this.set(a.x, a.y, a.kind);
+    this.occupyAgentCells(a);
     if (isElk(a)) a.stepsSincePoop = (a.stepsSincePoop || 0) + 1;
   }
 
@@ -603,7 +724,7 @@ class World {
     for (const [dx, dy] of dirs) {
       const nx = a.x + dx;
       const ny = a.y + dy;
-      if (this.isWalkable(nx, ny)) {
+      if (this.canAgentMoveTo(a, nx, ny)) {
         this.moveAgentTo(a, nx, ny);
         return true;
       }
@@ -613,7 +734,7 @@ class World {
 
   fleeFrom(a, tx, ty) {
     const step = this.stepAway(a.x, a.y, tx, ty);
-    if (step && this.isWalkable(step.x, step.y)) {
+    if (step && this.canAgentMoveTo(a, step.x, step.y)) {
       this.moveAgentTo(a, step.x, step.y);
       return true;
     }
@@ -631,7 +752,7 @@ class World {
       : (dx ? { x: a.x + Math.sign(dx), y: a.y } : null);
     if (alt && (!primary || alt.x !== primary.x || alt.y !== primary.y)) steps.push(alt);
     for (const step of steps) {
-      if (this.isWalkable(step.x, step.y)) {
+      if (this.canAgentMoveTo(a, step.x, step.y)) {
         this.moveAgentTo(a, step.x, step.y);
         return true;
       }
@@ -674,7 +795,7 @@ class World {
     const dir = a.kind === HERB || isElk(a) ? this.seekHerb(a) : this.seekPred(a);
     const nx = a.x + dir.x;
     const ny = a.y + dir.y;
-    if (this.get(nx, ny) === EMPTY) this.moveAgentTo(a, nx, ny);
+    if (this.canAgentMoveTo(a, nx, ny)) this.moveAgentTo(a, nx, ny);
     else this.wanderAgent(a);
   }
 
@@ -709,6 +830,7 @@ class World {
   }
 
   pounceVictim(killer, spot, energyGain = 7.2) {
+    if (isKrolDushegub(killer)) return false;
     const victim = this.agentAt(spot.x, spot.y);
     if (!victim || victim.dead || !this.canHunt(killer, victim)) return false;
     this.moveAgentTo(killer, spot.x, spot.y);
@@ -737,45 +859,24 @@ class World {
   }
 
   feedKrolDushegub(a) {
-    for (let m = 0; m < KROL_MOVES_PER_TICK; m++) {
-      const aware = this.perceive(a);
-      const nearbyPrey = aware.prey.filter((p) => p.dist <= 1);
+    if (this.krolDevourRing(a)) return;
 
+    for (let m = 0; m < KROL_MOVES_PER_TICK; m++) {
+      if (this.krolDevourRing(a)) return;
+
+      const aware = this.perceive(a);
+      const nearbyPrey = aware.prey.filter((p) => p.dist <= 1.5);
       if (nearbyPrey.length) {
-        if (aware.touchPrey && nearbyPrey.some((p) => p.x === aware.touchPrey.x && p.y === aware.touchPrey.y)) {
-          const gain = this.krolHuntGain(aware.touchPrey.agent);
-          if (this.pounceVictim(a, aware.touchPrey, gain)) return;
-        }
-        const target = nearbyPrey[0];
-        this.nudgeToward(a, target.x, target.y);
-        const adj = this.findNearestAgent(a.x, a.y, 1, [HERB, PRED, BEAR], a, "touch");
-        if (adj) {
-          const victim = this.agentAt(adj.x, adj.y);
-          if (this.pounceVictim(a, adj, this.krolHuntGain(victim))) return;
-        }
+        this.nudgeToward(a, nearbyPrey[0].x, nearbyPrey[0].y);
+        if (this.krolDevourRing(a)) return;
         continue;
       }
 
-      const continuing = this.mealFromEating(a);
-      if (continuing) {
-        this.eatPlant(a, continuing);
-        return;
-      }
-      if (a.eating) a.eating = null;
-
       const food = this.krolSortFood(aware.food);
-      const touchFood = food.find((f) => f.dist <= 1);
-      if (touchFood) {
-        this.startEating(a, touchFood);
-        return;
-      }
-
       if (food.length) {
-        const target = food[0];
-        this.nudgeToward(a, target.x, target.y);
-        const after = this.krolNearestEdible(a.x, a.y, 1, a);
-        if (after) this.startEating(a, after);
-        return;
+        this.nudgeToward(a, food[0].x, food[0].y);
+        if (this.krolDevourRing(a)) return;
+        continue;
       }
 
       this.wanderAgent(a);
@@ -1012,7 +1113,7 @@ class World {
 
   removeAgentAt(x, y) {
     for (const a of this.agents) {
-      if (!a.dead && a.x === x && a.y === y) a.dead = true;
+      if (!a.dead && agentOccupies(a, x, y)) a.dead = true;
     }
     this.agents = this.agents.filter((a) => !a.dead);
   }
@@ -1091,6 +1192,7 @@ class World {
   applySpeciesTrait(baby, trait, x, y) {
     const cfg = SPECIES_CFG[trait];
     if (!cfg) return false;
+    if (trait === TRAIT.KROL && !this.canPlaceKrolAt(x, y, baby)) return false;
     baby.trait = trait;
     baby.energy = cfg.energy;
     baby.drain = cfg.drain;
@@ -1099,7 +1201,10 @@ class World {
     baby.hue = cfg.hue + Math.random() * 8;
     baby.moveInterval = cfg.moveInterval || 1;
     baby.movesPerTick = cfg.movesPerTick || 1;
-    if (trait === TRAIT.KROL) baby.bornGen = this.generation;
+    if (trait === TRAIT.KROL) {
+      baby.bornGen = this.generation;
+      this.occupyAgentCells(baby);
+    }
     this.mutations++;
     if (baby.kind === HERB) this.mutHerb++;
     else this.mutPred++;
@@ -1165,7 +1270,7 @@ class World {
   }
 
   agentAt(x, y) {
-    return this.agents.find((a) => !a.dead && a.x === x && a.y === y) || null;
+    return this.agents.find((a) => !a.dead && agentOccupies(a, x, y)) || null;
   }
 
   live(kind) {
@@ -1454,12 +1559,12 @@ class World {
 
   killAgent(victim, killer, energyGain) {
     const gain = energyGain ?? 7.2;
-    this.set(victim.x, victim.y, EMPTY);
+    this.clearAgentCells(victim);
     victim.dead = true;
     this.deaths++;
     this.addDecay(victim.x, victim.y, victim.kind);
     killer.energy += gain;
-    this.spark(killer.x, killer.y, "#ff5d7a");
+    this.spark(killer.x + (isKrolDushegub(killer) ? 1 : 0), killer.y + (isKrolDushegub(killer) ? 1 : 0), "#ff5d7a");
     if (isKrolDushegub(killer)) {
       this.chime("krol_hunt");
     } else if (killer.kind === BEAR) {
@@ -1476,7 +1581,7 @@ class World {
   dieAgent(a, reason) {
     if (isKrolDushegub(a)) this.spawnKrolLegacy(a);
     a.dead = true;
-    this.set(a.x, a.y, EMPTY);
+    this.clearAgentCells(a);
     this.deaths++;
     this.addDecay(a.x, a.y, a.kind);
     if (reason === "krol_burnout") {
@@ -1569,7 +1674,8 @@ class World {
             baby.cool = a.cool;
             if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y);
             else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
-            this.set(spot.x, spot.y, a.kind);
+            if (!isKrolDushegub(baby)) this.set(spot.x, spot.y, a.kind);
+            else this.occupyAgentCells(baby);
             babies.push(baby);
             this.births++;
             this.chime("birth");
@@ -1609,6 +1715,7 @@ window.World = World;
 window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
 window.PLANT_CFG = PLANT_CFG;
 window.KROL_LIFESPAN = KROL_LIFESPAN;
+window.KROL_SIZE = KROL_SIZE;
 window.TRAIT = TRAIT;
 window.SPECIES_CFG = SPECIES_CFG;
 window.MUT_CHANCE = MUT_CHANCE;

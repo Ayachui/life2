@@ -1,6 +1,6 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createWorld } = require("./harness.cjs");
+const { createWorld, placeKrol } = require("./harness.cjs");
 
 describe("поедание растений", () => {
   test("трава съедается за 2 укуса с соседней клетки", () => {
@@ -351,13 +351,11 @@ describe("аркада: конец раунда", () => {
 describe("крол-душегуб", () => {
   test("охотится даже когда сыт", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
-    world.set(3, 2, T.HERB);
-    const prey = world.makeAgent(3, 2, T.HERB);
+    world.set(4, 2, T.HERB);
+    const prey = world.makeAgent(4, 2, T.HERB);
     prey.trait = "коала";
     world.agents = [krol, prey];
     world.feedKrolDushegub(krol);
@@ -366,77 +364,81 @@ describe("крол-душегуб", () => {
 
   test("ест растения если нет добычи", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 5;
     krol.thresh = 12;
     world.agents = [krol];
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("ест дерево если звери не рядом", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
-    world.setPlant(3, 2, T.STAGE_TREE, 0);
+    world.setPlant(4, 2, T.STAGE_TREE, 0);
     world.set(10, 2, T.HERB);
     const far = world.makeAgent(10, 2, T.HERB);
     world.agents = [krol, far];
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 4);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("охотится только на зверей рядом", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 20;
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.set(6, 2, T.HERB);
     const prey = world.makeAgent(6, 2, T.HERB);
     prey.trait = "коала";
     world.agents = [krol, prey];
     world.feedKrolDushegub(krol);
     assert.equal(prey.dead, false);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("не перестаёт есть будучи сыт", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
     world.agents = [krol];
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("может съесть волка", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 20;
-    world.set(3, 2, T.PRED);
-    const wolf = world.makeAgent(3, 2, T.PRED);
+    world.set(4, 2, T.PRED);
+    const wolf = world.makeAgent(4, 2, T.PRED);
     wolf.trait = "волк";
     world.agents = [krol, wolf];
     world.feedKrolDushegub(krol);
     assert.equal(wolf.dead, true);
   });
 
+  test("съедает всё в кольце за один раз", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    world.setPlant(3, 4, T.STAGE_GRASS, 0);
+    world.setPlant(6, 4, T.STAGE_BUSH, 0);
+    world.setPlant(4, 3, T.STAGE_GRASS, 0);
+    world.feedKrolDushegub(krol);
+    assert.equal(world.get(3, 4), T.EMPTY);
+    assert.equal(world.get(6, 4), T.EMPTY);
+    assert.equal(world.get(4, 3), T.EMPTY);
+  });
+
   test("после смерти оставляет 3 зайцев", () => {
     const { world, T, KROL_LIFESPAN } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.bornGen = 0;
     krol.energy = 20;
     krol.thresh = 10;
@@ -450,12 +452,10 @@ describe("крол-душегуб", () => {
 
   test("никто не может убить крол-душегуба", () => {
     const { world, T } = createWorld();
-    world.set(5, 5, T.HERB);
-    const krol = world.makeAgent(5, 5, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 5, 5, T);
     krol.energy = 1;
-    world.set(6, 5, T.BEAR);
-    const bear = world.makeAgent(6, 5, T.BEAR);
+    world.set(8, 5, T.BEAR);
+    const bear = world.makeAgent(8, 5, T.BEAR);
     world.set(4, 5, T.PRED);
     const fox = world.makeAgent(4, 5, T.PRED);
     world.agents = [krol, bear, fox];
@@ -467,9 +467,7 @@ describe("крол-душегуб", () => {
 
   test("не умирает от голода", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.bornGen = 0;
     krol.energy = 0.1;
     krol.thresh = 12;
@@ -481,9 +479,8 @@ describe("крол-душегуб", () => {
 
   test("не наследуется потомкам", () => {
     const { world, T } = createWorld();
-    const parent = world.makeAgent(0, 0, T.HERB);
-    parent.trait = "крол-душегуб";
-    const baby = world.makeAgent(1, 0, T.HERB, parent);
+    const parent = placeKrol(world, 0, 0, T);
+    const baby = world.makeAgent(3, 0, T.HERB, parent);
     assert.notEqual(baby.trait, "крол-душегуб");
   });
 });
