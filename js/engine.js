@@ -54,7 +54,7 @@ const SPECIES_CFG = {
   [TRAIT.COW]: { energy: 50, drain: 1.2, thresh: 22, vision: 6, hue: 52, litter: 1, moveInterval: 4 },
   [TRAIT.WOLF]: { energy: 14, drain: 0.52, thresh: 15, vision: 12, hue: 220, litter: 1, moveInterval: 1 },
   [TRAIT.ELK]: { energy: 25, drain: 0.32, thresh: 17, vision: 9, hue: 185, litter: 1, moveInterval: 1 },
-  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 12, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 6 }
+  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 18, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 6 }
 };
 
 const NO_ANIMAL_RENEWAL_GENS = 90;
@@ -978,9 +978,8 @@ class World {
       if (this.krolDevourZone(a)) continue;
 
       const aware = this.perceive(a);
-      const nearbyPrey = aware.prey.filter((p) => p.dist <= 2);
-      if (nearbyPrey.length) {
-        this.nudgeToward(a, nearbyPrey[0].x, nearbyPrey[0].y);
+      if (aware.prey.length) {
+        this.nudgeToward(a, aware.prey[0].x, aware.prey[0].y);
         this.krolDevourZone(a);
         continue;
       }

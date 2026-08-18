@@ -379,25 +379,36 @@ describe("крол-душегуб", () => {
     krol.energy = 50;
     krol.thresh = 12;
     world.setPlant(4, 2, T.STAGE_TREE, 0);
-    world.set(10, 2, T.HERB);
-    const far = world.makeAgent(10, 2, T.HERB);
+    world.set(22, 2, T.HERB);
+    const far = world.makeAgent(22, 2, T.HERB);
     world.agents = [krol, far];
     world.feedKrolDushegub(krol);
     assert.equal(world.get(4, 2), T.EMPTY);
   });
 
-  test("охотится только на зверей рядом", () => {
+  test("преследует добычу в поле зрения, а не уходит к траве", () => {
     const { world, T } = createWorld();
     const krol = placeKrol(world, 2, 2, T);
     krol.energy = 20;
+    krol.vision = 18;
     world.setPlant(4, 2, T.STAGE_GRASS, 0);
-    world.set(6, 2, T.HERB);
-    const prey = world.makeAgent(6, 2, T.HERB);
+    world.set(10, 2, T.HERB);
+    const prey = world.makeAgent(10, 2, T.HERB);
     prey.trait = "коала";
     world.agents = [krol, prey];
+    const startX = krol.x;
     world.feedKrolDushegub(krol);
-    assert.equal(prey.dead, false);
-    assert.equal(world.get(4, 2), T.EMPTY);
+    assert.ok(krol.x > startX || prey.dead);
+  });
+
+  test("поле зрения 18 клеток", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    world.set(5, 5, T.HERB);
+    world.agents = [parent];
+    const baby = world.makeAgent(5, 5, T.HERB, parent);
+    world.applySpeciesTrait(baby, "крол-душегуб", 5, 5, parent);
+    assert.equal(baby.vision, 18);
   });
 
   test("не перестаёт есть будучи сыт", () => {
