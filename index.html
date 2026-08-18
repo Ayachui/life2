@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ЖИЗНЬ — Лаборатория эволюции</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="screen-menu" class="screen">
+      <canvas id="menu-bg" aria-hidden="true"></canvas>
+      <div class="menu-card">
+        <p class="eyebrow">для исследователей 10–14 лет</p>
+        <h1>ЖИЗНЬ</h1>
+        <p class="tagline">Лаборатория эволюции</p>
+        <p class="lede">
+          Нарисуй клетки, запусти время и смотри, как появляется жизнь:
+          леса, зайцы, охотники и даже космические корабли из клеток.
+        </p>
+        <div class="menu-actions">
+          <button class="btn primary xl" id="btn-campaign">Кампания</button>
+          <p class="menu-cap">8 опытов со звёздами: лес, глайдер, зайцы, мутанты.</p>
+          <button class="btn xl" id="btn-sandbox">Песочница</button>
+          <p class="menu-cap">Свободная чашка Петри. Приборы: сытость, жизнеспособность, осмотр.</p>
+          <button class="btn ghost xl" id="btn-classic">Классика Конвея</button>
+          <p class="menu-cap">Только клетки и три правила. Штампы: глайдер, мигалка, корабль.</p>
+        </div>
+        <p class="hint-line">Рисуй мышью или пальцем. Пробел — пауза.</p>
+        <p class="sources">Вдохновение: игра «Жизнь» Конвея, Particle Life, Particular и симуляторы эволюции в чашке Петри.</p>
+      </div>
+    </section>
+
+    <section id="screen-missions" class="screen hidden">
+      <header class="topbar">
+        <button class="btn ghost" id="btn-missions-back">← Меню</button>
+        <h2>Кампания учёного</h2>
+        <p class="stars-total" id="stars-total"></p>
+      </header>
+      <div class="mission-grid" id="mission-grid"></div>
+    </section>
+
+    <section id="screen-game" class="screen hidden">
+      <header class="topbar">
+        <button class="btn ghost" id="btn-game-back">← Назад</button>
+        <div class="title-block">
+          <h2 id="game-title">Песочница</h2>
+          <p id="game-subtitle">Свободный опыт</p>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="btn-sound" title="Звук">🔊</button>
+          <button class="icon-btn" id="btn-help" title="Как играть">?</button>
+        </div>
+      </header>
+
+      <div class="game-layout">
+        <aside class="panel tools">
+          <h3>Инструменты</h3>
+          <div class="tool-grid" id="tool-grid"></div>
+          <p class="tool-help" id="tool-help"></p>
+          <div class="stamps hidden" id="stamp-box">
+            <h3>Штампы</h3>
+            <div class="stamp-row" id="stamp-row"></div>
+          </div>
+          <div class="transport">
+            <button class="btn primary" id="btn-play">▶ Старт</button>
+            <button class="btn" id="btn-step">⏭ Шаг</button>
+            <button class="btn" id="btn-reset">↺ Заново</button>
+          </div>
+          <label class="speed">
+            Скорость
+            <input type="range" id="speed" min="1" max="5" value="2" />
+          </label>
+        </aside>
+
+        <div class="stage" id="stage">
+          <canvas id="world"></canvas>
+          <div class="legend" id="legend"></div>
+        </div>
+
+        <aside class="panel hud">
+          <div class="mission-card" id="mission-card">
+            <h3 id="hud-goal-title">Цель</h3>
+            <p id="hud-goal">Рисуй жизнь и нажимай Старт.</p>
+            <div class="star-row" id="star-row"></div>
+            <p class="hint" id="hud-hint"></p>
+          </div>
+          <div class="stats" id="stats-grid"></div>
+          <div class="analytics hidden" id="analytics"></div>
+          <div class="inspect-card hidden" id="inspect-card"></div>
+          <div class="log" id="log"></div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" id="modal-card"></div>
+  </div>
+  <div id="toasts" class="toasts"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/leaderboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

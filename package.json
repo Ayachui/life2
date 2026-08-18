@@ -1,0 +1,16 @@
+{
+  "name": "life-tzunki",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ЖИЗНЬ — аркадная экосистема в чашке Петри",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3"
+  },
+  "devDependencies": {
+    "vercel": "^41.0.0"
+  }
+}
