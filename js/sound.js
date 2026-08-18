@@ -12,6 +12,7 @@ const LifeSound = (() => {
     evolve_tree: 220,
     wilt: 350,
     hunt: 280,
+    krol_eat: 120,
     death_herb: 320,
     death_pred: 400,
     birth: 200,
@@ -192,9 +193,18 @@ const LifeSound = (() => {
       setTimeout(() => slide(920, 160, 0.4, "square", 0.05), 220);
       setTimeout(() => tone(55, 0.5, "sine", 0.04), 380);
     },
+    krol_eat() {
+      slide(95, 42, 0.18, "sawtooth", 0.065);
+      setTimeout(() => tone(48, 0.22, "sine", 0.05), 40);
+      [70, 130, 185, 240].forEach((delay, i) => {
+        setTimeout(() => {
+          noiseBurst(0.045 + i * 0.01, 0.038 + i * 0.006, 520 + i * 90);
+          tone(110 + i * 12, 0.035, "triangle", 0.014);
+        }, delay);
+      });
+    },
     krol_hunt() {
-      slide(420, 90, 0.12, "sawtooth", 0.04);
-      noiseBurst(0.08, 0.06, 320);
+      SFX.krol_eat();
     },
     krol_fade() {
       slide(280, 70, 0.35, "triangle", 0.03);

@@ -310,7 +310,7 @@ class World {
       ate = true;
     }
 
-    if (ate) this.chime(hunted ? "krol_hunt" : "eat_grass");
+    if (ate) this.chime("krol_eat");
     return ate;
   }
 
@@ -1705,11 +1705,9 @@ class World {
     this.awardDeathPoints(victim);
     this.awardProcessedEnergy(gain);
     this.spark(killer.x + (isKrolDushegub(killer) ? 1 : 0), killer.y + (isKrolDushegub(killer) ? 1 : 0), "#ff5d7a");
-    if (isKrolDushegub(killer)) {
-      this.chime("krol_hunt");
-    } else if (killer.kind === BEAR) {
+    if (!isKrolDushegub(killer) && killer.kind === BEAR) {
       this.chime("bear_hunt");
-    } else {
+    } else if (!isKrolDushegub(killer)) {
       this.chime("hunt");
     }
     if (victim.kind === BEAR) this.chime("death_bear");
