@@ -290,7 +290,8 @@ class World {
       for (const c of krolFootprintAt(x, y)) {
         if (!this.inside(c.x, c.y)) return false;
         const t = this.get(c.x, c.y);
-        if (t !== EMPTY && !agentOccupies(a, c.x, c.y)) {
+        if (t === WALL && !(this.arcade && this.inDish(c.x, c.y))) return false;
+        if (t !== EMPTY && t !== PLANT && !agentOccupies(a, c.x, c.y)) {
           if (!(this.arcade && this.inDish(c.x, c.y) && (t === WATER || t === WALL))) return false;
         }
         const other = this.agentAt(c.x, c.y);
@@ -784,6 +785,14 @@ class World {
   }
 
   moveAgentTo(a, x, y) {
+    if (isKrolDushegub(a)) {
+      for (const c of krolFootprintAt(x, y)) {
+        if (this.get(c.x, c.y) === PLANT) {
+          a.energy += this.plantEnergyRemaining(c.x, c.y);
+          this.spark(c.x, c.y, "#ffc14d");
+        }
+      }
+    }
     this.clearAgentCells(a);
     a.x = x;
     a.y = y;
@@ -1194,20 +1203,27 @@ class World {
     this.agents = this.agents.filter((a) => !a.dead);
   }
 
+  canPlaceAnimalAt(x, y) {
+    if (!this.inside(x, y)) return false;
+    if (this.agentAt(x, y)) return false;
+    if (this.get(x, y) !== EMPTY) return false;
+    return true;
+  }
+
   paint(x, y, brush) {
     if (!this.inside(x, y)) return false;
     if (this.get(x, y) === WALL && brush !== "erase") {
       if (this.dish && !this.inDish(x, y)) return false;
     }
-    this.removeAgentAt(x, y);
     if (brush === "erase") {
+      this.removeAgentAt(x, y);
       if (this.dish && !this.inDish(x, y)) return false;
       this.clearPlant(x, y);
       this.set(x, y, EMPTY);
       return true;
     }
     if (brush === "plant") {
-      if (this.get(x, y) !== EMPTY) return false;
+      if (!this.canPlaceAnimalAt(x, y)) return false;
       this.setPlant(x, y, STAGE_GRASS, 0);
       return true;
     }
@@ -1215,17 +1231,19 @@ class World {
       if (this.arcade) return false;
     }
     if (brush === "water") {
+      this.removeAgentAt(x, y);
       this.clearPlant(x, y);
       this.set(x, y, WATER);
       return true;
     }
     if (brush === "wall") {
+      this.removeAgentAt(x, y);
       this.clearPlant(x, y);
       this.set(x, y, WALL);
       return true;
     }
     if (brush === "herb" || brush === "pred" || brush === "bear") {
-      if (this.get(x, y) !== EMPTY) return false;
+      if (!this.canPlaceAnimalAt(x, y)) return false;
       const kind = brush === "herb" ? HERB : brush === "pred" ? PRED : BEAR;
       this.set(x, y, kind);
       this.agents.push(this.makeAgent(x, y, kind));

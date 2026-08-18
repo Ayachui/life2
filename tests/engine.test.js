@@ -511,11 +511,45 @@ describe("крол-душегуб", () => {
     );
     assert.ok(nearParent);
     for (const c of footprint) {
-      if (c.x === 6 && c.y === 5) assert.equal(world.get(6, 5), T.EMPTY);
-      if (c.x === 5 && c.y === 6) assert.equal(world.get(5, 6), T.EMPTY);
+      assert.equal(world.get(c.x, c.y), T.HERB);
     }
     assert.equal(parent.dead, false);
     if (footprint.some((c) => c.x === 7 && c.y === 5)) assert.equal(snack.dead, true);
+  });
+});
+
+describe("размещение животных", () => {
+  test("нельзя поставить зайца на занятую клетку", () => {
+    const { world, T } = createWorld();
+    world.set(3, 3, T.HERB);
+    world.agents.push(world.makeAgent(3, 3, T.HERB));
+    assert.equal(world.paint(3, 3, "herb"), false);
+    assert.equal(world.agents.filter((a) => !a.dead && a.kind === T.HERB).length, 1);
+  });
+
+  test("нельзя поставить на клетку крол-душегуба", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    assert.equal(world.paint(5, 4, "herb"), false);
+    assert.equal(world.paint(4, 5, "pred"), false);
+    assert.equal(world.paint(2, 2, "herb"), true);
+  });
+
+  test("крол-душегуб проходит через растения", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    world.setPlant(6, 4, T.STAGE_GRASS, 0);
+    world.setPlant(6, 5, T.STAGE_BUSH, 0);
+    world.setPlant(5, 6, T.STAGE_TREE, 0);
+    world.setPlant(6, 6, T.STAGE_GRASS, 0);
+    assert.ok(world.canAgentMoveTo(krol, 5, 4));
+    world.moveAgentTo(krol, 5, 4);
+    assert.equal(krol.x, 5);
+    assert.equal(krol.y, 4);
+    assert.equal(world.get(6, 4), T.HERB);
+    assert.equal(world.get(6, 5), T.HERB);
   });
 });
 

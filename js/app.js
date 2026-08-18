@@ -17,6 +17,7 @@
     speedTicks: [0.33, 0.67, 1, 1.67, 3.33],
     world: null,
     painting: false,
+    lastPaintCell: null,
     inspect: null,
     gameEnded: false,
     krolResumePlaying: false,
@@ -475,6 +476,21 @@
     app.cell = s;
   }
 
+  function isAnimalTool(tool = app.tool) {
+    return tool === "herb" || tool === "pred" || tool === "bear";
+  }
+
+  function krolCellKeys(w) {
+    const keys = new Set();
+    for (const a of w.agents) {
+      if (a.dead || a.trait !== "крол-душегуб") continue;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) keys.add(`${a.x + dx},${a.y + dy}`);
+      }
+    }
+    return keys;
+  }
+
   function cellFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const pt = e.touches ? e.touches[0] : e;
@@ -501,12 +517,15 @@
       updateStats();
       return;
     }
+    const cellKey = `${app.tool}:${x},${y}`;
+    if (app.lastPaintCell === cellKey) return;
     if (!canPaint()) {
       toast("Не хватает энергии");
       return;
     }
     const cost = toolCost(app.tool);
     const ok = app.world.paint(x, y, app.tool);
+    if (ok) app.lastPaintCell = cellKey;
     if (ok && cost > 0) {
       app.energy -= cost;
       updateEnergy();
@@ -558,10 +577,13 @@
 
     drawDecays(w, s);
 
+    const krolMask = krolCellKeys(w);
+
     for (let y = 0; y < w.h; y++) {
       for (let x = 0; x < w.w; x++) {
         const t = w.get(x, y);
         if (t === T.EMPTY) continue;
+        if (krolMask.has(`${x},${y}`)) continue;
         if (t === T.WALL) {
           if (w.dish && !w.inDish(x, y)) {
             ctx.fillStyle = "#0a1820";
@@ -582,7 +604,16 @@
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       const icon = agentIcon(a);
       if (a.trait === "крол-душегуб") {
-        drawEmoji(icon, a.x + 1, a.y + 1, s, 0.45 + 0.55 * sat, 1.9);
+        const alpha = 0.45 + 0.55 * sat;
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.28;
+        ctx.fillStyle = "#e040fb";
+        ctx.fillRect(a.x * s + 1, a.y * s + 1, s * 2 - 2, s * 2 - 2);
+        ctx.strokeStyle = "rgba(224, 64, 251, 0.75)";
+        ctx.lineWidth = Math.max(2, s * 0.08);
+        ctx.strokeRect(a.x * s + 1, a.y * s + 1, s * 2 - 2, s * 2 - 2);
+        ctx.restore();
+        drawEmoji(icon, a.x + 1, a.y + 1, s, alpha, 2.15);
         continue;
       }
       const scale = a.trait === "корова" ? 1.05
@@ -881,12 +912,32 @@
     }
   }
 
-  canvas.addEventListener("mousedown", (e) => { app.painting = true; paintAt(e); });
-  canvas.addEventListener("mousemove", (e) => { if (app.painting) paintAt(e); });
-  window.addEventListener("mouseup", () => { app.painting = false; });
-  canvas.addEventListener("touchstart", (e) => { e.preventDefault(); app.painting = true; paintAt(e); }, { passive: false });
-  canvas.addEventListener("touchmove", (e) => { e.preventDefault(); if (app.painting) paintAt(e); }, { passive: false });
-  canvas.addEventListener("touchend", () => { app.painting = false; });
+  canvas.addEventListener("mousedown", (e) => {
+    app.painting = true;
+    app.lastPaintCell = null;
+    paintAt(e);
+  });
+  canvas.addEventListener("mousemove", (e) => {
+    if (app.painting && !isAnimalTool()) paintAt(e);
+  });
+  window.addEventListener("mouseup", () => {
+    app.painting = false;
+    app.lastPaintCell = null;
+  });
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    app.painting = true;
+    app.lastPaintCell = null;
+    paintAt(e);
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    if (app.painting && !isAnimalTool()) paintAt(e);
+  }, { passive: false });
+  canvas.addEventListener("touchend", () => {
+    app.painting = false;
+    app.lastPaintCell = null;
+  });
 
   $("btn-arcade").onclick = () => { LifeSound.play("ui"); renderDifficulty(); showScreen("screen-difficulty"); };
   $("btn-sandbox").onclick = () => { LifeSound.play("ui"); startSandbox(); };
