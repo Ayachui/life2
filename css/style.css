@@ -67,6 +67,16 @@ button, input { font-family: inherit; }
   color: var(--text);
   font-size: 18px;
   cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.icon-btn.off { opacity: 0.38; }
+.audio-controls {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 60;
+  display: flex;
+  gap: 8px;
 }
 
 #menu-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -104,6 +114,13 @@ h1 {
 .tagline { margin: 0; color: var(--amber); font-weight: 800; font-size: 20px; }
 .lede { color: var(--muted); line-height: 1.45; margin: 18px 0 8px; }
 .hint-line { color: var(--muted); font-size: 13px; margin-top: 16px; }
+.game-version {
+  color: #5a7282;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 10px 0 0;
+}
 .sources { color: #6f8796; font-size: 12px; line-height: 1.4; margin: 8px 0 0; }
 
 .topbar {
@@ -339,8 +356,135 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
 }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
 
+.energy-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 193, 77, 0.12);
+  border: 1px solid rgba(255, 193, 77, 0.35);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 800;
+  color: var(--amber);
+}
+.energy-pill strong { font-size: 18px; color: var(--text); }
+
+.tool small {
+  display: block;
+  font-size: 10px;
+  color: var(--amber);
+  margin-top: 2px;
+}
+.tool.disabled { opacity: 0.4; cursor: not-allowed; }
+
+.diff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 22px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.diff-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.diff-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--mint);
+}
+.diff-emoji { font-size: 40px; margin-bottom: 8px; }
+.diff-card h3 { font-family: "Fredoka", sans-serif; margin: 0 0 6px; }
+.diff-card p { margin: 0; color: var(--amber); font-weight: 800; }
+
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(4, 10, 16, 0.92);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+.tutorial-inner {
+  width: min(520px, calc(100% - 32px));
+  background: #10202b;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.tut-icon { font-size: 56px; margin: 12px 0; }
+.tutorial-inner h2 { font-family: "Fredoka", sans-serif; margin: 0 0 12px; font-size: 28px; }
+.tutorial-inner p { color: var(--muted); line-height: 1.5; margin: 0 0 20px; }
+.tut-progress { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.tut-progress i {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+}
+.tut-progress i.on { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+.tut-progress i.done { background: var(--mint); opacity: 0.5; }
+.tut-skip {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.modal-card.wide { width: min(640px, calc(100% - 32px)); }
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 12px 0;
+}
+.lb-table th, .lb-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.lb-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.lb-table .empty-lb { text-align: center; color: var(--muted); padding: 20px; }
+.score-big {
+  font-family: "Fredoka", sans-serif;
+  font-size: 48px;
+  color: var(--mint-2);
+  margin: 8px 0;
+}
+.score-big span { font-size: 18px; color: var(--muted); }
+.name-field {
+  display: block;
+  text-align: left;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  margin: 16px 0;
+}
+.name-field input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stats { grid-template-columns: 1fr 1fr 1fr; }
+
 @media (max-width: 980px) {
   .game-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: auto; }
   .panel { border: none; }
   body { overflow: auto; }
+  .stats { grid-template-columns: 1fr 1fr; }
 }
