@@ -157,11 +157,51 @@ class World {
     this.herbStreak = 0;
     this.sustainedChain = false;
     this.pendingEnergy = 0;
+    this.lifePoints = 0;
     this.sounds = [];
   }
 
   chime(name, opts = {}) {
     this.sounds.push({ name, ...opts });
+  }
+
+  lifePointTable() {
+    return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.lifePoints) || {};
+  }
+
+  agentLifeKey(a) {
+    if (!a) return "rabbit";
+    if (a.kind === BEAR) return "bear";
+    if (isKrolDushegub(a)) return "krol";
+    if (isKoala(a)) return "koala";
+    if (isCow(a)) return "cow";
+    if (isWolf(a)) return "wolf";
+    if (isElk(a)) return "elk";
+    if (a.kind === PRED) return "fox";
+    return "rabbit";
+  }
+
+  pointsFor(category, key) {
+    const table = this.lifePointTable()[category];
+    const v = table?.[key];
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  awardLifePoints(amount) {
+    if (!this.arcade || !amount || amount <= 0) return;
+    this.lifePoints += amount;
+  }
+
+  awardBirthPoints(agent) {
+    this.awardLifePoints(this.pointsFor("birth", this.agentLifeKey(agent)));
+  }
+
+  awardDeathPoints(agent) {
+    this.awardLifePoints(this.pointsFor("death", this.agentLifeKey(agent)));
+  }
+
+  awardProcessedEnergy(energy) {
+    this.awardLifePoints(Math.max(1, Math.round(energy)));
   }
 
   idx(x, y) { return y * this.w + x; }
@@ -262,7 +302,9 @@ class World {
 
     for (const c of cells) {
       if (this.get(c.x, c.y) !== PLANT) continue;
-      a.energy += this.plantEnergyRemaining(c.x, c.y);
+      const energy = this.plantEnergyRemaining(c.x, c.y);
+      a.energy += energy;
+      this.awardProcessedEnergy(energy);
       this.clearPlant(c.x, c.y);
       this.spark(c.x, c.y, "#ffc14d");
       ate = true;
@@ -1211,6 +1253,7 @@ class World {
     if (brush === "plant") {
       if (!this.canPlaceAnimalAt(x, y)) return false;
       this.setPlant(x, y, STAGE_GRASS, 0);
+      this.awardLifePoints(this.pointsFor("plant", "place"));
       return true;
     }
     if (brush === "water" || brush === "wall") {
@@ -1232,7 +1275,10 @@ class World {
       if (!this.canPlaceAnimalAt(x, y)) return false;
       const kind = brush === "herb" ? HERB : brush === "pred" ? PRED : BEAR;
       this.set(x, y, kind);
-      this.agents.push(this.makeAgent(x, y, kind));
+      const agent = this.makeAgent(x, y, kind);
+      this.agents.push(agent);
+      this.awardLifePoints(this.pointsFor("place", brush));
+      this.awardBirthPoints(agent);
       return true;
     }
     return false;
@@ -1289,6 +1335,8 @@ class World {
     this.mutations++;
     if (baby.kind === HERB) this.mutHerb++;
     else this.mutPred++;
+    this.awardLifePoints(this.pointsFor("mutation", trait));
+    this.awardBirthPoints(baby);
     const energy = this.grantMutationEnergy(trait);
     this.lastMutation = { kind: baby.kind, trait, special: true, x: baby.x, y: baby.y, energy };
     if (trait === TRAIT.KROL) {
@@ -1497,6 +1545,7 @@ class World {
     });
     this.fx.push({ x, y, color: "#8b6914", t: 1.4, fert: true });
     this.chime("fertilize");
+    this.awardLifePoints(this.pointsFor("activity", "fertilize"));
   }
 
   addDecay(x, y, kind) {
@@ -1518,6 +1567,7 @@ class World {
     this.births++;
     this.spark(x, y, "#5dff8a");
     this.chime("sprout");
+    this.awardLifePoints(this.pointsFor("plant", "sprout"));
     return true;
   }
 
@@ -1536,6 +1586,7 @@ class World {
           this.setPlant(x, y, STAGE_BUSH, 0);
           this.spark(x, y, "#46d070");
           this.chime("evolve_bush");
+          this.awardLifePoints(this.pointsFor("plant", "evolveGrass"));
         } else if (stage === STAGE_BUSH) {
           if (this.plantAge[i] >= PLANT_CFG.bushToTree) {
             this.setPlant(x, y, STAGE_TREE, 0);
@@ -1543,6 +1594,7 @@ class World {
             this.grantEvolutionEnergy();
             this.spark(x, y, "#2a9e50");
             this.chime("evolve_tree");
+            this.awardLifePoints(this.pointsFor("plant", "evolveBush"));
           } else {
             const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
             for (const [dx, dy] of dirs) {
@@ -1561,6 +1613,7 @@ class World {
           this.clearPlant(x, y);
           this.spawnGrassAt(x, y);
           this.chime("wilt");
+          this.awardLifePoints(this.pointsFor("plant", "wilt"));
         }
       }
     }
@@ -1598,8 +1651,10 @@ class World {
       const perBite = stage === STAGE_GRASS
         ? PLANT_CFG.grassEnergy / PLANT_CFG.grassBites
         : PLANT_CFG.bushEnergyPerBite;
+      const gained = perBite * mult;
       this.plantBites[i]--;
-      a.energy += perBite * mult;
+      a.energy += gained;
+      this.awardProcessedEnergy(gained);
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         a.eating = null;
@@ -1608,8 +1663,10 @@ class World {
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
     } else if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) {
+      const gained = PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
       this.plantBites[i]--;
-      a.energy += PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
+      a.energy += gained;
+      this.awardProcessedEnergy(gained);
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         this.spawnGrassAt(meal.x, meal.y);
@@ -1633,6 +1690,7 @@ class World {
       const baby = this.makeAgent(spot.x, spot.y, HERB);
       this.set(spot.x, spot.y, HERB);
       this.agents.push(baby);
+      this.awardBirthPoints(baby);
       this.births++;
       this.chime("birth");
     }
@@ -1645,6 +1703,8 @@ class World {
     this.deaths++;
     this.addDecay(victim.x, victim.y, victim.kind);
     killer.energy += gain;
+    this.awardDeathPoints(victim);
+    this.awardProcessedEnergy(gain);
     this.spark(killer.x + (isKrolDushegub(killer) ? 1 : 0), killer.y + (isKrolDushegub(killer) ? 1 : 0), "#ff5d7a");
     if (isKrolDushegub(killer)) {
       this.chime("krol_hunt");
@@ -1665,6 +1725,7 @@ class World {
     this.clearAgentCells(a);
     this.deaths++;
     this.addDecay(a.x, a.y, a.kind);
+    this.awardDeathPoints(a);
     if (reason === "krol_burnout") {
       this.chime("krol_fade");
       this.fx.push({ x: a.x, y: a.y, color: "#e040fb", t: 1.8, krol: true });
@@ -1757,6 +1818,7 @@ class World {
             else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
             if (!isKrolDushegub(baby)) this.set(spot.x, spot.y, a.kind);
             babies.push(baby);
+            if (!baby.trait) this.awardBirthPoints(baby);
             this.births++;
             this.chime("birth");
           }

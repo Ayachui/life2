@@ -145,7 +145,7 @@
       const title = app.world.gameOverReason === "no_chain"
         ? "Лесу не хватило живых зверей"
         : "Экосистема остановилась";
-      showGameOverOverlay(title, app.world.generation, app.difficulty);
+      showGameOverOverlay(title, app.world.lifePoints, app.world.generation, app.difficulty);
     }
   }
 
@@ -161,10 +161,10 @@
     $("gameover-overlay").classList.add("hidden");
   }
 
-  function showGameOverOverlay(title, cycles, diff) {
+  function showGameOverOverlay(title, points, cycles, diff) {
     $("gameover-title").textContent = title;
-    $("gameover-score").innerHTML = `${cycles} <span>ходов</span>`;
-    $("gameover-meta").textContent = `${diff.label} · осталось ⚡ ${app.energy}`;
+    $("gameover-score").innerHTML = `${points} <span>очков</span>`;
+    $("gameover-meta").textContent = `${diff.label} · ${cycles} циклов · осталось ⚡ ${app.energy}`;
     $("gameover-overlay").classList.remove("hidden");
   }
 
@@ -381,7 +381,7 @@
       $("game-title").textContent = "Аркада";
       $("game-subtitle").textContent = difficulty.label;
       $("hud-goal-title").textContent = "Цель";
-      $("hud-goal").textContent = `Продержись как можно дольше. Энергия на старт: ${difficulty.energy} ⚡`;
+      $("hud-goal").textContent = `Набирай очки жизни: рождения, эволюции, охота и смерти. Энергия на старт: ${difficulty.energy} ⚡`;
       $("hud-hint").textContent = difficulty.id === "hardcore"
         ? "На старте в центре уже растёт трава. Держи стаю зайцев живой 25 ходов подряд — за деревья и особых зверей дают энергию."
         : "Держи стаю зайцев живой 25 ходов подряд. За деревья и особых зверей дают энергию.";
@@ -701,6 +701,17 @@
     if (cycleIco) cycleIco.textContent = cycleIcon;
     if (cycleVal) cycleVal.textContent = w.generation;
 
+    const lifeBadge = $("life-badge");
+    const lifePointsVal = $("life-points-val");
+    if (lifeBadge && lifePointsVal) {
+      if (app.gameType === "arcade") {
+        lifeBadge.classList.remove("hidden");
+        lifePointsVal.textContent = w.lifePoints || 0;
+      } else {
+        lifeBadge.classList.add("hidden");
+      }
+    }
+
     const stats = [
       { icon: "🌱", label: "Трава", value: a.grass },
       { icon: "🌿", label: "Кусты", value: a.bush },
@@ -806,9 +817,11 @@
     const rows = scores.length
       ? scores.map((s, i) => {
           const diff = LifeLeaderboard.DIFF_LABELS[s.difficulty] || s.difficulty || "—";
-          return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${s.cycles}</td><td>${diff}</td><td>${s.date || ""}</td></tr>`;
+          const pts = s.points ?? s.cycles ?? 0;
+          const cycles = s.cycles ?? 0;
+          return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${pts}</td><td>${cycles}</td><td>${diff}</td><td>${s.date || ""}</td></tr>`;
         }).join("")
-      : '<tr><td colspan="5" class="empty-lb">Пока пусто — сыграй в аркаду!</td></tr>';
+      : '<tr><td colspan="6" class="empty-lb">Пока пусто — сыграй в аркаду!</td></tr>';
 
     const note = source === "local"
       ? '<p class="lb-note">Показаны записи только с этого устройства. Общая таблица появится, когда сервер подключён.</p>'
@@ -818,7 +831,7 @@
       <h3>🏆 Таблица лидеров</h3>
       ${note}
       <table class="lb-table">
-        <thead><tr><th>#</th><th>Имя</th><th>Ходы</th><th>Сложность</th><th>Дата</th></tr></thead>
+        <thead><tr><th>#</th><th>Имя</th><th>Очки</th><th>Циклы</th><th>Сложность</th><th>Дата</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="modal-actions"><button class="btn primary" type="button" id="lb-close">Закрыть</button></div>
@@ -832,6 +845,7 @@
   async function gameOver() {
     if (app.gameType !== "arcade") return;
     const cycles = app.world.generation;
+    const points = app.world.lifePoints;
     const diff = app.difficulty;
     const title = app.world.gameOverReason === "no_chain"
       ? "Лесу не хватило живых зверей"
@@ -845,7 +859,7 @@
     app.krolResumePlaying = false;
     dismissKrolOverlay(false);
     $("btn-play").textContent = "▶ Старт";
-    showGameOverOverlay(title, cycles, diff);
+    showGameOverOverlay(title, points, cycles, diff);
   }
 
   function reset() {
@@ -1011,7 +1025,8 @@
   $("go-submit").onclick = async () => {
     const name = $("go-name").value.trim() || "Аноним";
     const cycles = app.world.generation;
-    const result = await LifeLeaderboard.submitScore({ name, cycles, difficulty: app.difficulty.id });
+    const points = app.world.lifePoints;
+    const result = await LifeLeaderboard.submitScore({ name, points, cycles, difficulty: app.difficulty.id });
     hideGameOverOverlay();
     if (result.saved) {
       LifeSound.play("score");

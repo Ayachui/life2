@@ -1,4 +1,4 @@
-const KEY = "life:arcade:leaderboard";
+const KEY = "life:arcade:leaderboard-v2";
 const MAX = 50;
 
 const DIFFICULTIES = ["easy", "medium", "hard", "hardcore"];
@@ -40,16 +40,23 @@ function validDifficulty(d) {
   return DIFFICULTIES.includes(d);
 }
 
+function validatePoints(points) {
+  const p = Number(points);
+  if (!Number.isFinite(p) || p < 0 || p > 99999999) return null;
+  return Math.floor(p);
+}
+
 function validateCycles(cycles) {
   const c = Number(cycles);
-  if (!Number.isFinite(c) || c < 1 || c > 999999) return null;
+  if (!Number.isFinite(c) || c < 0 || c > 999999) return null;
   return Math.floor(c);
 }
 
-function buildEntry({ name, cycles, difficulty }) {
+function buildEntry({ name, points, cycles, difficulty }) {
   return {
     name: sanitizeName(name),
-    cycles,
+    points,
+    cycles: cycles ?? 0,
     difficulty,
     date: new Date().toISOString().slice(0, 10)
   };
@@ -59,7 +66,8 @@ function packMember(entry) {
   return JSON.stringify({
     name: entry.name,
     difficulty: entry.difficulty,
-    date: entry.date
+    date: entry.date,
+    cycles: entry.cycles ?? 0
   });
 }
 
@@ -71,7 +79,11 @@ function unpackScores(raw) {
     for (const row of raw) {
       try {
         const meta = typeof row.member === "string" ? JSON.parse(row.member) : row.member;
-        scores.push({ ...meta, cycles: Number(row.score) });
+        scores.push({
+          ...meta,
+          points: Number(row.score),
+          cycles: Number(meta.cycles ?? meta.points ?? row.score)
+        });
       } catch {
         /* skip corrupt */
       }
@@ -83,7 +95,11 @@ function unpackScores(raw) {
     try {
       const member = raw[i];
       const meta = typeof member === "string" ? JSON.parse(member) : member;
-      scores.push({ ...meta, cycles: Number(raw[i + 1]) });
+      scores.push({
+        ...meta,
+        points: Number(raw[i + 1]),
+        cycles: Number(meta.cycles ?? meta.points ?? raw[i + 1])
+      });
     } catch {
       /* skip corrupt */
     }
@@ -100,6 +116,7 @@ module.exports = {
   sanitizeName,
   validDifficulty,
   validateCycles,
+  validatePoints,
   buildEntry,
   packMember,
   unpackScores
