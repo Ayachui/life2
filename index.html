@@ -49,7 +49,7 @@
           <h2 id="game-title">Аркада</h2>
           <p id="game-subtitle">Сложный</p>
         </div>
-        <div class="energy-pill hidden" id="energy-pill">
+        <div class="energy-pill hidden" id="energy-pill" aria-hidden="true">
           <span>⚡</span>
           <strong id="energy-val">500</strong>
         </div>
@@ -71,10 +71,23 @@
           </div>
         </aside>
 
-        <div class="stage" id="stage">
-          <canvas id="world"></canvas>
-          <div class="legend" id="legend"></div>
-        </div>
+        <main class="play-column">
+          <div class="play-head" id="play-head">
+            <div class="cycle-badge" id="cycle-badge" title="Циклы">
+              <span class="cycle-ico" id="cycle-ico" aria-hidden="true">⏱</span>
+              <strong id="cycle-val">0</strong>
+            </div>
+            <div class="energy-pill energy-pill--play hidden" id="energy-pill-play">
+              <span>⚡</span>
+              <strong id="energy-val-play">0</strong>
+            </div>
+          </div>
+
+          <div class="stage" id="stage">
+            <canvas id="world"></canvas>
+            <div class="legend" id="legend"></div>
+          </div>
+        </main>
 
         <aside class="panel hud" aria-label="Статистика">
           <div class="mission-card" id="hud-card">

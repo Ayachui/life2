@@ -291,11 +291,16 @@
 
   function updateEnergy() {
     const pill = $("energy-pill");
+    const pillPlay = $("energy-pill-play");
+    const text = String(app.energy);
     if (app.gameType === "arcade") {
       pill.classList.remove("hidden");
-      $("energy-val").textContent = app.energy;
+      $("energy-val").textContent = text;
+      pillPlay?.classList.remove("hidden");
+      if ($("energy-val-play")) $("energy-val-play").textContent = text;
     } else {
       pill.classList.add("hidden");
+      pillPlay?.classList.add("hidden");
     }
     renderTools();
   }
@@ -624,8 +629,14 @@
 
     const cycleLabel = app.gameType === "arcade" ? "Циклы" : "Поколение";
     const cycleIcon = app.gameType === "arcade" ? "⏱" : "🧬";
+    const cycleBadge = $("cycle-badge");
+    const cycleIco = $("cycle-ico");
+    const cycleVal = $("cycle-val");
+    if (cycleBadge) cycleBadge.title = cycleLabel;
+    if (cycleIco) cycleIco.textContent = cycleIcon;
+    if (cycleVal) cycleVal.textContent = w.generation;
+
     const stats = [
-      { icon: cycleIcon, label: cycleLabel, value: w.generation },
       { icon: "🌱", label: "Трава", value: a.grass },
       { icon: "🌿", label: "Кусты", value: a.bush },
       { icon: "🌳", label: "Деревья", value: a.tree },
