@@ -209,6 +209,82 @@ class World {
     return true;
   }
 
+  krolBirthAnchorsAround(px, py) {
+    const anchors = [
+      { x: px, y: py },
+      { x: px - 1, y: py },
+      { x: px, y: py - 1 },
+      { x: px - 1, y: py - 1 },
+      { x: px + 1, y: py },
+      { x: px - 2, y: py },
+      { x: px, y: py + 1 },
+      { x: px, y: py - 2 },
+      { x: px + 1, y: py - 1 },
+      { x: px - 2, y: py - 1 },
+      { x: px + 1, y: py + 1 },
+      { x: px - 2, y: py + 1 }
+    ];
+    for (let i = anchors.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [anchors[i], anchors[j]] = [anchors[j], anchors[i]];
+    }
+    return anchors;
+  }
+
+  canPlaceKrolBirthAt(ax, ay, parent, baby) {
+    for (const c of krolFootprintAt(ax, ay)) {
+      if (!this.inside(c.x, c.y)) return false;
+      const t = this.get(c.x, c.y);
+      if (t === WALL && !(this.arcade && this.inDish(c.x, c.y))) return false;
+      for (const o of this.agents) {
+        if (o.dead || o === baby || o === parent) continue;
+        if (agentOccupies(o, c.x, c.y) && isKrolDushegub(o)) return false;
+      }
+    }
+    return true;
+  }
+
+  krolDevourFootprint(a, exempt = []) {
+    const exemptSet = new Set(exempt);
+    const footprint = agentFootprint(a);
+    let ate = false;
+
+    const victims = [];
+    for (const o of this.agents) {
+      if (o.dead || o === a || exemptSet.has(o)) continue;
+      if (footprint.some((c) => agentOccupies(o, c.x, c.y)) && this.canHunt(a, o)) victims.push(o);
+    }
+    for (const victim of victims) {
+      this.killAgent(victim, a, this.krolHuntGain(victim));
+      ate = true;
+    }
+
+    for (const c of footprint) {
+      if (this.get(c.x, c.y) !== PLANT) continue;
+      a.energy += this.plantEnergyRemaining(c.x, c.y);
+      this.clearPlant(c.x, c.y);
+      this.spark(c.x, c.y, "#ffc14d");
+      ate = true;
+    }
+
+    if (ate) this.chime(victims.length ? "krol_hunt" : "eat_grass");
+    return ate;
+  }
+
+  birthKrolAroundParent(baby, parent) {
+    const anchors = this.krolBirthAnchorsAround(parent.x, parent.y);
+    for (const anchor of anchors) {
+      if (!this.canPlaceKrolBirthAt(anchor.x, anchor.y, parent, baby)) continue;
+      baby.x = anchor.x;
+      baby.y = anchor.y;
+      baby.bornGen = this.generation;
+      this.krolDevourFootprint(baby, [parent]);
+      this.occupyAgentCells(baby);
+      return true;
+    }
+    return false;
+  }
+
   canAgentMoveTo(a, x, y) {
     if (isKrolDushegub(a)) {
       for (const c of krolFootprintAt(x, y)) {
@@ -1189,10 +1265,9 @@ class World {
     return agent;
   }
 
-  applySpeciesTrait(baby, trait, x, y) {
+  applySpeciesTrait(baby, trait, x, y, parent = null) {
     const cfg = SPECIES_CFG[trait];
     if (!cfg) return false;
-    if (trait === TRAIT.KROL && !this.canPlaceKrolAt(x, y, baby)) return false;
     baby.trait = trait;
     baby.energy = cfg.energy;
     baby.drain = cfg.drain;
@@ -1202,19 +1277,21 @@ class World {
     baby.moveInterval = cfg.moveInterval || 1;
     baby.movesPerTick = cfg.movesPerTick || 1;
     if (trait === TRAIT.KROL) {
-      baby.bornGen = this.generation;
-      this.occupyAgentCells(baby);
+      if (!parent || !this.birthKrolAroundParent(baby, parent)) {
+        baby.trait = null;
+        return false;
+      }
     }
     this.mutations++;
     if (baby.kind === HERB) this.mutHerb++;
     else this.mutPred++;
     const energy = this.grantMutationEnergy(trait);
-    this.lastMutation = { kind: baby.kind, trait, special: true, x, y, energy };
+    this.lastMutation = { kind: baby.kind, trait, special: true, x: baby.x, y: baby.y, energy };
     if (trait === TRAIT.KROL) {
       this.pendingKrolAlert = { energy };
-      this.fx.push({ x, y, color: "#e040fb", t: 2.4, krol: true });
-      this.spark(x, y, "#ff3dff");
-      this.spark(x, y, "#ffffff");
+      this.fx.push({ x: baby.x, y: baby.y, color: "#e040fb", t: 2.4, krol: true });
+      this.spark(baby.x, baby.y, "#ff3dff");
+      this.spark(baby.x + 1, baby.y + 1, "#ffffff");
       this.chime("krol_dushegub");
     } else {
       this.chime("mutate");
@@ -1238,7 +1315,7 @@ class World {
     return gain;
   }
 
-  tryHerbSpeciesMutation(baby, x, y) {
+  tryHerbSpeciesMutation(baby, x, y, parent = null) {
     if (baby.kind !== HERB) return false;
     const roll = Math.random();
     let acc = 0;
@@ -1249,7 +1326,7 @@ class World {
     ];
     for (const [trait, base] of order) {
       acc += this.effectiveChance(base, baby.gen);
-      if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
+      if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y, parent);
     }
     return false;
   }
@@ -1672,10 +1749,9 @@ class World {
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
             baby.energy = a.energy;
             baby.cool = a.cool;
-            if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y);
+            if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y, a);
             else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
             if (!isKrolDushegub(baby)) this.set(spot.x, spot.y, a.kind);
-            else this.occupyAgentCells(baby);
             babies.push(baby);
             this.births++;
             this.chime("birth");

@@ -483,6 +483,40 @@ describe("крол-душегуб", () => {
     const baby = world.makeAgent(3, 0, T.HERB, parent);
     assert.notEqual(baby.trait, "крол-душегуб");
   });
+
+  test("при рождении занимает 2×2 вокруг родителя и съедает содержимое", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    parent.energy = 20;
+    parent.thresh = 13;
+    world.set(5, 5, T.HERB);
+    world.setPlant(6, 5, T.STAGE_GRASS, 0);
+    world.setPlant(5, 6, T.STAGE_BUSH, 0);
+    world.set(7, 5, T.HERB);
+    const snack = world.makeAgent(7, 5, T.HERB);
+    world.agents = [parent, snack];
+
+    const baby = world.makeAgent(4, 5, T.HERB, parent);
+    baby.trait = "крол-душегуб";
+    assert.ok(world.birthKrolAroundParent(baby, parent));
+
+    const footprint = [
+      { x: baby.x, y: baby.y },
+      { x: baby.x + 1, y: baby.y },
+      { x: baby.x, y: baby.y + 1 },
+      { x: baby.x + 1, y: baby.y + 1 }
+    ];
+    const nearParent = footprint.some((c) =>
+      Math.max(Math.abs(c.x - parent.x), Math.abs(c.y - parent.y)) <= 1
+    );
+    assert.ok(nearParent);
+    for (const c of footprint) {
+      if (c.x === 6 && c.y === 5) assert.equal(world.get(6, 5), T.EMPTY);
+      if (c.x === 5 && c.y === 6) assert.equal(world.get(5, 6), T.EMPTY);
+    }
+    assert.equal(parent.dead, false);
+    if (footprint.some((c) => c.x === 7 && c.y === 5)) assert.equal(snack.dead, true);
+  });
 });
 
 describe("лес без зверей", () => {
