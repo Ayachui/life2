@@ -681,6 +681,7 @@ class World {
   canHunt(killer, victim) {
     if (!killer || !victim || killer.dead || victim.dead) return false;
     if (killer === victim) return false;
+    if (isKrolDushegub(victim)) return false;
 
     if (isKrolDushegub(killer)) {
       return victim.kind === HERB || victim.kind === PRED || victim.kind === BEAR;
@@ -700,7 +701,6 @@ class World {
       if (isElk(killer)) return false;
       if (isWolf(victim)) return false;
       if (victim.kind !== HERB) return false;
-      if (isKrolDushegub(victim)) return false;
       if (isCow(victim)) return false;
       return true;
     }
@@ -1403,7 +1403,6 @@ class World {
 
   killAgent(victim, killer, energyGain) {
     const gain = energyGain ?? 7.2;
-    if (isKrolDushegub(victim)) this.spawnKrolLegacy(victim);
     this.set(victim.x, victim.y, EMPTY);
     victim.dead = true;
     this.deaths++;
@@ -1474,7 +1473,7 @@ class World {
       a.energy -= a.drain;
       if (a.cool > 0) a.cool--;
 
-      if (a.energy <= 0) {
+      if (a.energy <= 0 && !isKrolDushegub(a)) {
         this.dieAgent(a);
         continue;
       }

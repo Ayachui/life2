@@ -389,7 +389,7 @@ describe("крол-душегуб", () => {
     assert.equal(wolf.dead, true);
   });
 
-  test("умирает по таймеру", () => {
+  test("после смерти оставляет 3 зайцев", () => {
     const { world, T, KROL_LIFESPAN } = createWorld();
     world.set(2, 2, T.HERB);
     const krol = world.makeAgent(2, 2, T.HERB);
@@ -405,19 +405,35 @@ describe("крол-душегуб", () => {
     assert.equal(herbs.length, 3);
   });
 
-  test("после смерти оставляет 3 зайцев даже если убит", () => {
+  test("никто не может убить крол-душегуба", () => {
     const { world, T } = createWorld();
     world.set(5, 5, T.HERB);
     const krol = world.makeAgent(5, 5, T.HERB);
     krol.trait = "крол-душегуб";
-    krol.energy = 20;
+    krol.energy = 1;
     world.set(6, 5, T.BEAR);
     const bear = world.makeAgent(6, 5, T.BEAR);
-    world.agents = [krol, bear];
-    world.pounceVictim(bear, { x: 5, y: 5 });
-    assert.equal(krol.dead, true);
-    const herbs = world.agents.filter((a) => !a.dead && a.kind === T.HERB);
-    assert.equal(herbs.length, 3);
+    world.set(4, 5, T.PRED);
+    const fox = world.makeAgent(4, 5, T.PRED);
+    world.agents = [krol, bear, fox];
+    assert.equal(world.canHunt(bear, krol), false);
+    assert.equal(world.canHunt(fox, krol), false);
+    assert.equal(world.pounceVictim(bear, { x: 5, y: 5 }), false);
+    assert.equal(krol.dead, false);
+  });
+
+  test("не умирает от голода", () => {
+    const { world, T } = createWorld();
+    world.set(2, 2, T.HERB);
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.bornGen = 0;
+    krol.energy = 0.1;
+    krol.thresh = 12;
+    world.agents = [krol];
+    world.generation = 5;
+    world.stepAgents();
+    assert.equal(krol.dead, false);
   });
 
   test("не наследуется потомкам", () => {
