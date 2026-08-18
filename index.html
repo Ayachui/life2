@@ -66,20 +66,28 @@
           <div class="transport">
             <button class="btn primary" id="btn-play">▶ Старт</button>
             <button class="btn" id="btn-step">⏭ Шаг</button>
-            <button class="btn" id="btn-reset">↺ Заново</button>
-            <button class="btn speed-btn" id="btn-speed" type="button" title="Скорость симуляции">×2</button>
           </div>
         </aside>
 
         <main class="play-column">
           <div class="play-head" id="play-head">
-            <div class="cycle-badge" id="cycle-badge" title="Циклы">
-              <span class="cycle-ico" id="cycle-ico" aria-hidden="true">⏱</span>
-              <strong id="cycle-val">0</strong>
+            <div class="play-head-side play-head-side--left">
+              <button class="icon-btn" id="btn-music" type="button" title="Музыка" aria-pressed="true">🎵</button>
+              <button class="icon-btn" id="btn-sound" type="button" title="Звук" aria-pressed="true">🔊</button>
             </div>
-            <div class="energy-pill energy-pill--play hidden" id="energy-pill-play">
-              <span>⚡</span>
-              <strong id="energy-val-play">0</strong>
+            <div class="play-head-stats">
+              <div class="cycle-badge" id="cycle-badge" title="Циклы">
+                <span class="cycle-ico" id="cycle-ico" aria-hidden="true">⏱</span>
+                <strong id="cycle-val">0</strong>
+              </div>
+              <div class="energy-pill energy-pill--play hidden" id="energy-pill-play">
+                <span>⚡</span>
+                <strong id="energy-val-play">0</strong>
+              </div>
+            </div>
+            <div class="play-head-side play-head-side--right">
+              <button class="btn head-btn" id="btn-reset" type="button" title="Заново">↺</button>
+              <button class="btn speed-btn head-btn" id="btn-speed" type="button" title="Скорость симуляции">×2</button>
             </div>
           </div>
 
@@ -104,9 +112,9 @@
     </section>
   </div>
 
-  <div class="audio-controls" id="audio-controls">
-    <button class="icon-btn" id="btn-music" type="button" title="Музыка" aria-pressed="true">🎵</button>
-    <button class="icon-btn" id="btn-sound" type="button" title="Звук" aria-pressed="true">🔊</button>
+  <div class="audio-controls audio-controls--menu" id="audio-controls-menu">
+    <button class="icon-btn" id="btn-music-menu" type="button" title="Музыка" aria-pressed="true">🎵</button>
+    <button class="icon-btn" id="btn-sound-menu" type="button" title="Звук" aria-pressed="true">🔊</button>
   </div>
 
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true">

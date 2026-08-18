@@ -376,6 +376,49 @@ describe("крол-душегуб", () => {
     assert.ok(world.plantBites[world.idx(3, 2)] < 2);
   });
 
+  test("ест дерево если звери не рядом", () => {
+    const { world, T } = createWorld();
+    world.set(2, 2, T.HERB);
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 50;
+    krol.thresh = 12;
+    world.setPlant(3, 2, T.STAGE_TREE, 0);
+    world.set(10, 2, T.HERB);
+    const far = world.makeAgent(10, 2, T.HERB);
+    world.agents = [krol, far];
+    world.feedKrolDushegub(krol);
+    assert.ok(world.plantBites[world.idx(3, 2)] < 4);
+  });
+
+  test("охотится только на зверей рядом", () => {
+    const { world, T } = createWorld();
+    world.set(2, 2, T.HERB);
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 20;
+    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.set(6, 2, T.HERB);
+    const prey = world.makeAgent(6, 2, T.HERB);
+    prey.trait = "коала";
+    world.agents = [krol, prey];
+    world.feedKrolDushegub(krol);
+    assert.equal(prey.dead, false);
+    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+  });
+
+  test("не перестаёт есть будучи сыт", () => {
+    const { world, T } = createWorld();
+    const krol = world.makeAgent(2, 2, T.HERB);
+    krol.trait = "крол-душегуб";
+    krol.energy = 50;
+    krol.thresh = 12;
+    world.agents = [krol];
+    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.feedKrolDushegub(krol);
+    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+  });
+
   test("может съесть волка", () => {
     const { world, T } = createWorld();
     const krol = world.makeAgent(2, 2, T.HERB);

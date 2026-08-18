@@ -46,23 +46,39 @@
     layoutObserver.observe($("screen-game"));
   }
 
+  function syncAudioBtn(btn, kind, on) {
+    if (!btn) return;
+    if (kind === "sound") {
+      btn.textContent = on ? "🔊" : "🔇";
+      btn.title = on ? "Звук включён" : "Звук выключен";
+    } else {
+      btn.textContent = "🎵";
+      btn.title = on ? "Музыка включена" : "Музыка выключена";
+    }
+    btn.classList.toggle("off", !on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+
   function syncAudioUi() {
-    const soundBtn = $("btn-sound");
-    const musicBtn = $("btn-music");
     const soundOn = LifeSound.isEnabled();
     const musicOn = LifeMusic.isEnabled();
-    if (soundBtn) {
-      soundBtn.textContent = soundOn ? "🔊" : "🔇";
-      soundBtn.title = soundOn ? "Звук включён" : "Звук выключен";
-      soundBtn.classList.toggle("off", !soundOn);
-      soundBtn.setAttribute("aria-pressed", soundOn ? "true" : "false");
+    for (const btn of document.querySelectorAll("#btn-sound, #btn-sound-menu")) {
+      syncAudioBtn(btn, "sound", soundOn);
     }
-    if (musicBtn) {
-      musicBtn.textContent = "🎵";
-      musicBtn.title = musicOn ? "Музыка включена" : "Музыка выключена";
-      musicBtn.classList.toggle("off", !musicOn);
-      musicBtn.setAttribute("aria-pressed", musicOn ? "true" : "false");
+    for (const btn of document.querySelectorAll("#btn-music, #btn-music-menu")) {
+      syncAudioBtn(btn, "music", musicOn);
     }
+  }
+
+  function toggleSound() {
+    LifeSound.setEnabled(!LifeSound.isEnabled());
+    syncAudioUi();
+  }
+
+  function toggleMusic() {
+    LifeMusic.setEnabled(!LifeMusic.isEnabled());
+    syncAudioUi();
+    LifeSound.play("ui");
   }
 
   function toolCost(id) {
@@ -79,6 +95,8 @@
     for (const el of document.querySelectorAll(".screen")) el.classList.add("hidden");
     $(id).classList.remove("hidden");
     app.screen = id;
+    const menuAudio = $("audio-controls-menu");
+    if (menuAudio) menuAudio.classList.toggle("hidden", id === "screen-game");
     if (id === "screen-game") {
       watchLayout();
       requestAnimationFrame(() => {
@@ -909,15 +927,10 @@
     updateSpeedButton();
     LifeSound.play("ui");
   };
-  $("btn-sound").onclick = () => {
-    LifeSound.setEnabled(!LifeSound.isEnabled());
-    syncAudioUi();
-  };
-  $("btn-music").onclick = () => {
-    LifeMusic.setEnabled(!LifeMusic.isEnabled());
-    syncAudioUi();
-    LifeSound.play("ui");
-  };
+  $("btn-sound").onclick = toggleSound;
+  $("btn-music").onclick = toggleMusic;
+  $("btn-sound-menu").onclick = toggleSound;
+  $("btn-music-menu").onclick = toggleMusic;
   $("btn-help").onclick = () => {
     const h = LIFE_DATA.help[app.gameType] || LIFE_DATA.help.sandbox;
     openModal(`

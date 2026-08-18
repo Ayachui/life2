@@ -739,13 +739,14 @@ class World {
   feedKrolDushegub(a) {
     for (let m = 0; m < KROL_MOVES_PER_TICK; m++) {
       const aware = this.perceive(a);
+      const nearbyPrey = aware.prey.filter((p) => p.dist <= 1);
 
-      if (aware.prey.length) {
-        if (aware.touchPrey) {
+      if (nearbyPrey.length) {
+        if (aware.touchPrey && nearbyPrey.some((p) => p.x === aware.touchPrey.x && p.y === aware.touchPrey.y)) {
           const gain = this.krolHuntGain(aware.touchPrey.agent);
           if (this.pounceVictim(a, aware.touchPrey, gain)) return;
         }
-        const target = aware.prey[0];
+        const target = nearbyPrey[0];
         this.nudgeToward(a, target.x, target.y);
         const adj = this.findNearestAgent(a.x, a.y, 1, [HERB, PRED, BEAR], a, "touch");
         if (adj) {
@@ -762,21 +763,71 @@ class World {
       }
       if (a.eating) a.eating = null;
 
-      if (aware.touchFood) {
-        this.startEating(a, aware.touchFood);
+      const food = this.krolSortFood(aware.food);
+      const touchFood = food.find((f) => f.dist <= 1);
+      if (touchFood) {
+        this.startEating(a, touchFood);
         return;
       }
 
-      const plant = aware.food[0];
-      if (plant) {
-        this.nudgeToward(a, plant.x, plant.y);
-        const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
+      if (food.length) {
+        const target = food[0];
+        this.nudgeToward(a, target.x, target.y);
+        const after = this.krolNearestEdible(a.x, a.y, 1, a);
         if (after) this.startEating(a, after);
         return;
       }
 
       this.wanderAgent(a);
     }
+  }
+
+  krolFoodRank(stage) {
+    if (stage === STAGE_TREE) return 0;
+    if (stage === STAGE_BUSH) return 1;
+    return 2;
+  }
+
+  krolSortFood(food) {
+    return [...food].sort((a, b) => {
+      const dr = this.krolFoodRank(a.stage) - this.krolFoodRank(b.stage);
+      if (dr !== 0) return dr;
+      return a.man - b.man;
+    });
+  }
+
+  krolNearestEdible(x, y, range, eater) {
+    const distAt = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy));
+    let bestGrass = null, bestGrassD = 99;
+    let bestBush = null, bestBushD = 99;
+    let bestTree = null, bestTreeD = 99;
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (!dx && !dy) continue;
+        const dist = distAt(dx, dy);
+        if (dist > range) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (this.get(nx, ny) !== PLANT) continue;
+        const stage = this.plantStageAt(nx, ny);
+        if (stage === STAGE_GRASS && dist < bestGrassD) {
+          bestGrassD = dist;
+          bestGrass = { x: nx, y: ny, stage };
+        } else if (stage === STAGE_BUSH && dist < bestBushD) {
+          bestBushD = dist;
+          bestBush = { x: nx, y: ny, stage };
+        } else if (stage === STAGE_TREE && dist < bestTreeD) {
+          bestTreeD = dist;
+          bestTree = { x: nx, y: ny, stage };
+        }
+      }
+    }
+    const picks = [];
+    if (bestTree) picks.push({ meal: bestTree, rank: 0, d: bestTreeD });
+    if (bestBush) picks.push({ meal: bestBush, rank: 1, d: bestBushD });
+    if (bestGrass) picks.push({ meal: bestGrass, rank: 2, d: bestGrassD });
+    picks.sort((a, b) => a.rank - b.rank || a.d - b.d);
+    return picks[0]?.meal || null;
   }
 
   feedHungryHerb(a) {
@@ -1366,7 +1417,7 @@ class World {
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         a.eating = null;
-      } else if (a.energy >= a.thresh) {
+      } else if (a.energy >= a.thresh && !isKrolDushegub(a)) {
         a.eating = null;
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
@@ -1377,7 +1428,7 @@ class World {
         this.clearPlant(meal.x, meal.y);
         this.spawnGrassAt(meal.x, meal.y);
         a.eating = null;
-      } else if (a.energy >= a.thresh) {
+      } else if (a.energy >= a.thresh && !isKrolDushegub(a)) {
         a.eating = null;
       }
       this.chime("eat_tree");
