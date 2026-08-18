@@ -604,16 +604,7 @@
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       const icon = agentIcon(a);
       if (a.trait === "крол-душегуб") {
-        const alpha = 0.45 + 0.55 * sat;
-        ctx.save();
-        ctx.globalAlpha = alpha * 0.28;
-        ctx.fillStyle = "#e040fb";
-        ctx.fillRect(a.x * s + 1, a.y * s + 1, s * 2 - 2, s * 2 - 2);
-        ctx.strokeStyle = "rgba(224, 64, 251, 0.75)";
-        ctx.lineWidth = Math.max(2, s * 0.08);
-        ctx.strokeRect(a.x * s + 1, a.y * s + 1, s * 2 - 2, s * 2 - 2);
-        ctx.restore();
-        drawEmoji(icon, a.x + 1, a.y + 1, s, alpha, 2.15);
+        drawSpanEmoji(icon, a.x, a.y, 2, s, 0.45 + 0.55 * sat);
         continue;
       }
       const scale = a.trait === "корова" ? 1.05
@@ -666,6 +657,16 @@
       }
       ctx.globalAlpha = 1;
     }
+  }
+
+  function drawSpanEmoji(emoji, x, y, span, s, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `${Math.max(14, Math.floor(s * span * 0.88))}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(emoji, (x + span / 2) * s, (y + span / 2) * s);
+    ctx.restore();
   }
 
   function drawEmoji(emoji, x, y, s, alpha = 1, scale = 1) {
