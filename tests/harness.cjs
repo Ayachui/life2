@@ -34,6 +34,10 @@ function createWorld(w = 24, h = 24) {
 function placeKrol(world, x, y, T) {
   const krol = world.makeAgent(x, y, T.HERB);
   krol.trait = "крол-душегуб";
+  krol.vision = 18;
+  krol.movesPerTick = 6;
+  krol.thresh = 12;
+  krol.energy = 15;
   world.occupyAgentCells(krol);
   return krol;
 }
