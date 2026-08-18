@@ -152,6 +152,28 @@ describe("эволюция кустов", () => {
     assert.ok(avgGrass >= 2, `мало соседней травы от куста: ${avgGrass.toFixed(2)}`);
   });
 
+  test("дерево после гибели оставляет 1 траву", () => {
+    const { world, T, PLANT_CFG } = createWorld();
+    world.setPlant(5, 5, T.STAGE_TREE, PLANT_CFG.treeLife - 1);
+    world.growPlants();
+    assert.equal(world.plantStageAt(5, 5), T.STAGE_GRASS);
+  });
+
+  test("куст → дерево сеет 2 травы на соседних клетках", () => {
+    const { world, T, PLANT_CFG } = createWorld(10, 10);
+    world.setPlant(5, 5, T.STAGE_BUSH, PLANT_CFG.bushToTree - 1);
+    world.growPlants();
+    assert.equal(world.plantStageAt(5, 5), T.STAGE_TREE);
+    let grass = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        if (world.plantStageAt(5 + dx, 5 + dy) === T.STAGE_GRASS) grass++;
+      }
+    }
+    assert.equal(grass, 2);
+  });
+
   test("без зверей куст успевает созреть до дерева", () => {
     const { world, T, PLANT_CFG } = createWorld();
     world.setPlant(5, 5, T.STAGE_GRASS, PLANT_CFG.grassToBush - 1);
@@ -250,14 +272,16 @@ describe("поиск корма и охота", () => {
     assert.equal(world.canHunt(herb, pred), false);
   });
 
-  test("крол-душегуб охотится только на лис", () => {
+  test("крол-душегуб охотится на всех зверей", () => {
     const { world, T } = createWorld();
     const krol = world.makeAgent(0, 0, T.HERB);
     krol.trait = "крол-душегуб";
     const pred = world.makeAgent(1, 0, T.PRED);
     const herb = world.makeAgent(0, 1, T.HERB);
+    const bear = world.makeAgent(1, 1, T.BEAR);
     assert.equal(world.canHunt(krol, pred), true);
-    assert.equal(world.canHunt(krol, herb), false);
+    assert.equal(world.canHunt(krol, herb), true);
+    assert.equal(world.canHunt(krol, bear), true);
   });
 
   test("лиса не может есть крол-душегуба", () => {

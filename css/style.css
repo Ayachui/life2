@@ -195,7 +195,7 @@ h1 {
   box-shadow: 0 0 0 2px rgba(62, 224, 162, 0.25);
 }
 .transport { display: grid; gap: 8px; margin: 18px 0 12px; }
-.speed { display: grid; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 800; }
+.speed-btn { width: 100%; font-weight: 800; letter-spacing: 0.02em; }
 input[type="range"] { width: 100%; accent-color: var(--mint); }
 
 .stage {

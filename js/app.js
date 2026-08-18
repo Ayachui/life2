@@ -12,7 +12,9 @@
     tool: "plant",
     playing: false,
     started: false,
-    speed: 2,
+    speed: 0,
+    speedLabels: ["×2", "×3", "×5", "×10"],
+    speedTicks: [0.67, 1, 1.67, 3.33],
     world: null,
     painting: false,
     inspect: null,
@@ -484,8 +486,18 @@
       if (a.dead) continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       if (a.trait) drawTraitRing(a.x, a.y, s, a.trait);
-      const icon = a.kind === T.BEAR ? "🐻" : a.kind === T.PRED ? "🦊" : a.trait === "крол-душегуб" ? "🐇" : "🐰";
-      const scale = a.trait === "крол-душегуб" ? 1.08 : 0.88 + 0.1 * sat;
+      const icon = a.kind === T.BEAR ? "🐻"
+        : a.trait === "волк" ? "🐺"
+        : a.trait === "лось" ? "🦌"
+        : a.kind === T.PRED ? "🦊"
+        : a.trait === "крол-душегуб" ? "🐇"
+        : a.trait === "коала" ? "🐨"
+        : a.trait === "корова" ? "🐮"
+        : "🐰";
+      const scale = a.trait === "крол-душегуб" ? 1.08
+        : a.trait === "корова" ? 1.05
+        : a.trait === "лось" ? 1.02
+        : 0.88 + 0.1 * sat;
       drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
     }
 
@@ -608,8 +620,12 @@
     const a = w.agentAt(x, y);
     if (a) {
       const who = a.kind === T.BEAR ? "Медведь"
+        : a.trait === "волк" ? "Волк"
+        : a.trait === "лось" ? "Лось"
         : a.kind === T.PRED ? "Лиса"
         : a.trait === "крол-душегуб" ? "КРОЛ-ДУШЕГУБ"
+        : a.trait === "коала" ? "Коала"
+        : a.trait === "корова" ? "Корова"
         : "Заяц";
       const sat = Math.round(Math.min(1, a.energy / Math.max(0.2, a.thresh)) * 100);
       const mood = a.energy >= a.thresh ? "сыт" : "голоден";
@@ -620,7 +636,10 @@
         traitNote += `<br><span class="note">Осталось ~${left} циклов</span>`;
       }
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
-        : `поиск ${a.vision} кл.`;
+        : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
+        : a.trait === "крол-душегуб" ? `быстрый (×3), восприятие ${a.vision} кл.`
+        : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
+        : `восприятие ${a.vision} кл.`;
       return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${trait} · ${moveNote} · поколение ${a.gen}${traitNote}`;
     }
     const t = w.get(x, y);
@@ -633,7 +652,7 @@
         return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.bushToTree} тиков. Укусов: ${w.plantBites[i]}. До дерева ~${Math.max(0, left)}. Сеет траву рядом.`;
       }
       if (w.plantStage[i] === T.STAGE_TREE) {
-        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Зайцы не едят. Не размножается.`;
+        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Едят корова (10 ук.) и лось (8 ук.). После гибели — 1 трава.`;
       }
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
@@ -648,7 +667,12 @@
   }
 
   function ticksPerSec() {
-    return [2, 4, 7, 11, 16][app.speed - 1];
+    return app.speedTicks[app.speed] || app.speedTicks[0];
+  }
+
+  function updateSpeedButton() {
+    const btn = $("btn-speed");
+    if (btn) btn.textContent = app.speedLabels[app.speed] || app.speedLabels[0];
   }
 
   async function showLeaderboard(resumeGameOver = false) {
@@ -820,7 +844,11 @@
     draw();
   };
   $("btn-reset").onclick = reset;
-  $("speed").oninput = (e) => { app.speed = Number(e.target.value); };
+  $("btn-speed").onclick = () => {
+    app.speed = (app.speed + 1) % app.speedLabels.length;
+    updateSpeedButton();
+    LifeSound.play("ui");
+  };
   $("btn-sound").onclick = () => {
     LifeSound.setEnabled(!LifeSound.isEnabled());
     syncAudioUi();
@@ -880,6 +908,7 @@
   window.addEventListener("resize", resize);
 
   syncAudioUi();
+  updateSpeedButton();
   $("game-version").textContent = formatGameVersion();
   LifeMusic.start();
   requestAnimationFrame(loop);

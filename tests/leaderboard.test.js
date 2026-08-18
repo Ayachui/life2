@@ -47,4 +47,12 @@ describe("лидерборд API", () => {
     assert.equal(scores[0].cycles, 100);
     assert.equal(scores[0].difficulty, "easy");
   });
+
+  test("unpackScores поддерживает формат объектов Upstash", () => {
+    const entry = buildEntry({ name: "Облако", cycles: 77, difficulty: "hard" });
+    const raw = [{ member: packMember(entry), score: 77 }];
+    const scores = unpackScores(raw);
+    assert.equal(scores[0].name, "Облако");
+    assert.equal(scores[0].cycles, 77);
+  });
 });

@@ -12,7 +12,11 @@ const PLANT_CFG = {
   grassBites: 2,
   bushBites: 4,
   grassEnergy: 3.5,
-  bushEnergyPerBite: 0.85
+  bushEnergyPerBite: 0.85,
+  treeBitesCow: 10,
+  treeBitesElk: 8,
+  treeEnergyPerBite: 0.45,
+  bushToTreeGrass: 2
 };
 
 const DECAY_CFG = {
@@ -21,19 +25,92 @@ const DECAY_CFG = {
   bear: { radius: 5, strength: 0.16, ttl: 62 }
 };
 
-const KROL_CHANCE = 0.03;
-const KROL_LIFESPAN = 52;
-const KROL_LITTER = 3;
-const KROL_TRAIT = "крол-душегуб";
+const FERTILIZER_CFG = { ttl: 5, strength: 0.3 };
 
-function isKrolDushegub(a) {
-  return !!a && a.kind === HERB && a.trait === KROL_TRAIT;
-}
+const TRAIT = {
+  KROL: "крол-душегуб",
+  KOALA: "коала",
+  COW: "корова",
+  WOLF: "волк",
+  ELK: "лось",
+  KEEN: "зоркий",
+  NEARSIGHTED: "близорукий",
+  GLUTTON: "прожорливый",
+  FRUGAL: "экономный"
+};
+
+const MUT_CHANCE = {
+  krol: 0.005,
+  koala: 0.02,
+  cow: 0.01,
+  wolf: 0.02,
+  elk: 0.02
+};
+
+const KROL_LIFESPAN = 15;
+const KROL_DEATH_SPAWN = 3;
+const KROL_MOVES_PER_TICK = 3;
+const WOLF_SOLITUDE = 10;
+const ELK_POOP_INTERVAL = 5;
+const MUT_GEN_BOOST = 0.3;
+
+const SPECIES_CFG = {
+  [TRAIT.KOALA]: { energy: 12, drain: 0.28, thresh: 14, vision: 8, hue: 145, litter: 2, moveInterval: 1 },
+  [TRAIT.COW]: { energy: 50, drain: 1.2, thresh: 22, vision: 6, hue: 52, litter: 1, moveInterval: 4 },
+  [TRAIT.WOLF]: { energy: 14, drain: 0.52, thresh: 15, vision: 12, hue: 220, litter: 1, moveInterval: 1 },
+  [TRAIT.ELK]: { energy: 25, drain: 0.32, thresh: 17, vision: 9, hue: 185, litter: 1, moveInterval: 1 },
+  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 9, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 3 }
+};
 
 const NO_ANIMAL_RENEWAL_GENS = 90;
 const ARCADE_STALE_AFTER = 40;
 const ARCADE_LONELY_MAX = 120;
 const CHAIN_SUSTAIN_GENS = 25;
+
+const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
+
+function isTrait(a, t) {
+  return !!a && a.trait === t;
+}
+
+function isKrolDushegub(a) {
+  return isTrait(a, TRAIT.KROL);
+}
+
+function isKoala(a) {
+  return isTrait(a, TRAIT.KOALA);
+}
+
+function isCow(a) {
+  return isTrait(a, TRAIT.COW);
+}
+
+function isWolf(a) {
+  return isTrait(a, TRAIT.WOLF);
+}
+
+function isElk(a) {
+  return isTrait(a, TRAIT.ELK);
+}
+
+function isSpecialSpecies(a) {
+  return !!a && SPECIAL_TRAITS.has(a.trait);
+}
+
+function herbSpecies(a) {
+  if (!a || a.kind !== HERB) return "rabbit";
+  if (isKrolDushegub(a)) return "krol";
+  if (isKoala(a)) return "koala";
+  if (isCow(a)) return "cow";
+  return "rabbit";
+}
+
+function predSpecies(a) {
+  if (!a || a.kind !== PRED) return "fox";
+  if (isWolf(a)) return "wolf";
+  if (isElk(a)) return "elk";
+  return "fox";
+}
 
 class World {
   constructor(w, h) {
@@ -45,6 +122,7 @@ class World {
     this.plantBites = new Uint8Array(w * h);
     this.agents = [];
     this.decays = [];
+    this.fertilizers = [];
     this.generation = 0;
     this.births = 0;
     this.deaths = 0;
@@ -76,6 +154,14 @@ class World {
   get(x, y) { return this.inside(x, y) ? this.cells[this.idx(x, y)] : WALL; }
   set(x, y, v) { if (this.inside(x, y)) this.cells[this.idx(x, y)] = v; }
 
+  mutationMult() {
+    return 1 + MUT_GEN_BOOST * this.generation;
+  }
+
+  effectiveChance(base) {
+    return Math.min(1, base * this.mutationMult());
+  }
+
   clearPlant(x, y) {
     const i = this.idx(x, y);
     this.cells[i] = EMPTY;
@@ -93,17 +179,44 @@ class World {
       : stage === STAGE_GRASS ? PLANT_CFG.grassBites : 0;
   }
 
+  spawnGrassAt(x, y) {
+    if (this.get(x, y) !== EMPTY) return false;
+    this.setPlant(x, y, STAGE_GRASS, 0);
+    this.births++;
+    this.spark(x, y, "#5dff8a");
+    return true;
+  }
+
+  spawnGrassAround(x, y, count) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+    let spawned = 0;
+    for (const [dx, dy] of dirs) {
+      if (spawned >= count) break;
+      if (this.spawnGrassAt(x + dx, y + dy)) spawned++;
+    }
+    return spawned;
+  }
+
   mealFromEating(a) {
     if (!a.eating) return null;
     const { x, y } = a.eating;
     if (this.get(x, y) !== PLANT) return null;
     const stage = this.plantStageAt(x, y);
-    if (stage !== STAGE_GRASS && stage !== STAGE_BUSH) return null;
-    return { x, y, stage };
+    if (stage === STAGE_GRASS || stage === STAGE_BUSH) return { x, y, stage };
+    if (stage === STAGE_TREE && (isCow(a) || isElk(a))) return { x, y, stage };
+    return null;
   }
 
   startEating(a, meal) {
     a.eating = { x: meal.x, y: meal.y };
+    if (meal.stage === STAGE_TREE && this.plantBites[this.idx(meal.x, meal.y)] <= 0) {
+      const bites = isCow(a) ? PLANT_CFG.treeBitesCow : PLANT_CFG.treeBitesElk;
+      this.plantBites[this.idx(meal.x, meal.y)] = bites;
+    }
     this.eatPlant(a, meal);
   }
 
@@ -129,7 +242,6 @@ class World {
     return Math.hypot(x - this.dish.cx, y - this.dish.cy) <= this.dish.r;
   }
 
-  /** В аркаде вода и камни внутри чашки не меняют симуляцию (только песочница). */
   isWalkable(x, y) {
     const t = this.get(x, y);
     if (t === EMPTY) return true;
@@ -145,6 +257,7 @@ class World {
     w.plantBites.set(this.plantBites);
     w.agents = this.agents.map((a) => ({ ...a }));
     w.decays = this.decays.map((d) => ({ ...d }));
+    w.fertilizers = this.fertilizers.map((f) => ({ ...f }));
     w.dish = this.dish ? { ...this.dish } : null;
     w.mutateRate = this.mutateRate;
     w.mutHerb = this.mutHerb;
@@ -193,7 +306,6 @@ class World {
     if (this.hasAnimals()) return;
     const broke = energy < herbCost;
 
-    // Полное вымирание (нет ни зверей, ни растений) — конец даже после устойчивой цепочки
     if (!this.isAlive()) {
       if (this.lonelyGens >= ARCADE_LONELY_MAX) {
         this.gameOver = true;
@@ -240,12 +352,96 @@ class World {
     return boost;
   }
 
-  findNearestEdible(x, y, range, metric = "scout") {
+  fertilizerBoost(x, y) {
+    let boost = 0;
+    for (const f of this.fertilizers) {
+      if (Math.abs(f.x - x) <= 1 && Math.abs(f.y - y) <= 1) boost = Math.max(boost, f.strength);
+    }
+    return boost;
+  }
+
+  growthMulAt(x, y) {
+    return 1 + this.fertilizerBoost(x, y);
+  }
+
+  distCheb(ax, ay, bx, by) {
+    return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+  }
+
+  distMan(ax, ay, bx, by) {
+    return Math.abs(ax - bx) + Math.abs(ay - by);
+  }
+
+  perceive(agent) {
+    const range = agent.vision || 7;
+    const px = agent.x;
+    const py = agent.y;
+    const food = [];
+    const prey = [];
+    const threats = [];
+    const exits = [];
+
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (!dx && !dy) continue;
+        const nx = px + dx;
+        const ny = py + dy;
+        const man = this.distMan(px, py, nx, ny);
+        const cheb = this.distCheb(px, py, nx, ny);
+        if (man > range) continue;
+
+        if (this.get(nx, ny) === PLANT) {
+          const stage = this.plantStageAt(nx, ny);
+          if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
+            food.push({ x: nx, y: ny, stage, dist: cheb, man });
+          } else if (stage === STAGE_TREE && (isCow(agent) || isElk(agent))) {
+            food.push({ x: nx, y: ny, stage, dist: cheb, man });
+          }
+        }
+
+        if (this.isWalkable(nx, ny)) exits.push({ x: nx, y: ny, dist: cheb });
+      }
+    }
+
+    for (const o of this.agents) {
+      if (o.dead || o === agent) continue;
+      const man = this.distMan(px, py, o.x, o.y);
+      const cheb = this.distCheb(px, py, o.x, o.y);
+      if (man > range) continue;
+
+      if (this.canHunt(agent, o) && cheb > 0) {
+        prey.push({ agent: o, x: o.x, y: o.y, dist: cheb, man, hungry: o.energy < o.thresh });
+      }
+      if (this.isThreatTo(o, agent)) {
+        threats.push({ agent: o, x: o.x, y: o.y, dist: cheb, man });
+      }
+    }
+
+    food.sort((a, b) => a.man - b.man);
+    prey.sort((a, b) => this.preyPriority(agent, a.agent, px, py) - this.preyPriority(agent, b.agent, px, py));
+    threats.sort((a, b) => a.man - b.man);
+
+    const touchFood = food.find((f) => f.dist <= 1);
+    const touchPrey = prey.find((p) => p.dist <= 1);
+    const touchThreat = threats.find((t) => t.dist <= 1);
+    const deadEnd = exits.length <= 2;
+
+    return { food, prey, threats, exits, touchFood, touchPrey, touchThreat, deadEnd, range };
+  }
+
+  isThreatTo(hunter, victim) {
+    if (!hunter || !victim || hunter.dead || victim.dead) return false;
+    return this.canHunt(hunter, victim);
+  }
+
+  findNearestEdible(x, y, range, metric = "scout", eater = null) {
     const distAt = metric === "touch"
       ? (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy))
       : (dx, dy) => Math.abs(dx) + Math.abs(dy);
     let bestGrass = null, bestGrassD = 99;
     let bestBush = null, bestBushD = 99;
+    let bestTree = null, bestTreeD = 99;
+    const canEatTree = eater && (isCow(eater) || isElk(eater));
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
         if (!dx && !dy) continue;
@@ -261,24 +457,40 @@ class World {
         } else if (stage === STAGE_BUSH && dist < bestBushD) {
           bestBushD = dist;
           bestBush = { x: nx, y: ny, stage };
+        } else if (stage === STAGE_TREE && canEatTree && dist < bestTreeD) {
+          bestTreeD = dist;
+          bestTree = { x: nx, y: ny, stage };
         }
       }
     }
-    return bestGrass || bestBush;
+    return bestGrass || bestBush || bestTree;
   }
 
   preyPriority(hunter, prey, px, py) {
     const d = Math.abs(prey.x - px) + Math.abs(prey.y - py);
     let score = d;
     if (prey.energy < prey.thresh) score -= 0.35;
-    if (prey.trait === "близорукий") score -= 0.25;
-    if (prey.trait === "экономный") score -= 0.15;
-    if (hunter.trait === "прожорливый") score -= 0.2;
+    if (prey.trait === TRAIT.NEARSIGHTED) score -= 0.25;
+    if (prey.trait === TRAIT.FRUGAL) score -= 0.15;
+    if (hunter.trait === TRAIT.GLUTTON) score -= 0.2;
+    if (hunter.kind === BEAR && prey.kind === PRED) score -= 0.45;
+    if (hunter.kind === BEAR && prey.energy < prey.thresh) score -= 0.2;
+    if (isKrolDushegub(hunter) && prey.kind === PRED) score -= 0.15;
+    if (isWolf(hunter) && isCow(prey)) score -= 0.3;
+    if (isWolf(hunter) && prey.kind === HERB) score -= 0.1;
     return score;
   }
 
   findNearestPrey(x, y, range, hunter, metric = "scout") {
-    return this.findNearestAgent(x, y, range, [HERB], hunter, metric);
+    return this.findNearestAgent(x, y, range, this.preyKindsFor(hunter), hunter, metric);
+  }
+
+  preyKindsFor(hunter) {
+    if (isKrolDushegub(hunter)) return [HERB, PRED, BEAR];
+    if (isWolf(hunter)) return [HERB, PRED];
+    if (hunter.kind === BEAR) return [HERB, PRED];
+    if (hunter.kind === PRED && !isElk(hunter)) return [HERB];
+    return [];
   }
 
   findNearestAgent(x, y, range, kinds, hunter, metric = "scout") {
@@ -288,18 +500,15 @@ class World {
     let best = null, bestScore = 99;
     for (const o of this.agents) {
       if (o.dead || !kinds.includes(o.kind)) continue;
-      if (hunter?.kind === PRED && isKrolDushegub(o)) continue;
+      if (hunter?.kind === PRED && !isWolf(hunter) && !isElk(hunter) && this.isSpecialHerb(o)) continue;
       const dx = o.x - x;
       const dy = o.y - y;
       const dist = distAt(dx, dy);
       if (dist > range || dist === 0) continue;
+      if (hunter && !this.canHunt(hunter, o)) continue;
       let score = dist;
-      if (hunter?.kind === PRED) score = this.preyPriority(hunter, o, x, y);
-      else if (hunter?.kind === BEAR) {
-        if (o.kind === PRED) score -= 0.45;
-        if (o.energy < o.thresh) score -= 0.2;
-      } else if (hunter?.trait === "крол-душегуб" && o.kind === PRED) {
-        score -= 0.15;
+      if (hunter && (hunter.kind === PRED || hunter.kind === BEAR || isKrolDushegub(hunter) || isWolf(hunter))) {
+        score = this.preyPriority(hunter, o, x, y);
       }
       if (score < bestScore) {
         bestScore = score;
@@ -307,6 +516,33 @@ class World {
       }
     }
     return best ? { x: best.x, y: best.y } : null;
+  }
+
+  isSpecialHerb(a) {
+    return isKrolDushegub(a) || isKoala(a) || isCow(a);
+  }
+
+  nearestWolfDist(x, y, self) {
+    let best = Infinity;
+    for (const o of this.agents) {
+      if (o.dead || o === self || !isWolf(o)) continue;
+      best = Math.min(best, this.distMan(x, y, o.x, o.y));
+    }
+    return best;
+  }
+
+  nearestWolf(x, y, self) {
+    let best = null;
+    let bestD = Infinity;
+    for (const o of this.agents) {
+      if (o.dead || o === self || !isWolf(o)) continue;
+      const d = this.distMan(x, y, o.x, o.y);
+      if (d < bestD) {
+        bestD = d;
+        best = o;
+      }
+    }
+    return best;
   }
 
   stepToward(ax, ay, tx, ty) {
@@ -317,11 +553,24 @@ class World {
     return { x: ax, y: ay + Math.sign(dy) };
   }
 
+  stepAway(ax, ay, tx, ty) {
+    const dx = ax - tx;
+    const dy = ay - ty;
+    if (!dx && !dy) {
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const d = dirs[Math.floor(Math.random() * 4)];
+      return { x: ax + d[0], y: ay + d[1] };
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) return { x: ax + Math.sign(dx), y: ay };
+    return { x: ax, y: ay + Math.sign(dy) };
+  }
+
   moveAgentTo(a, x, y) {
     this.set(a.x, a.y, EMPTY);
     a.x = x;
     a.y = y;
     this.set(a.x, a.y, a.kind);
+    if (isElk(a)) a.stepsSincePoop = (a.stepsSincePoop || 0) + 1;
   }
 
   wanderAgent(a) {
@@ -339,6 +588,15 @@ class World {
       }
     }
     return false;
+  }
+
+  fleeFrom(a, tx, ty) {
+    const step = this.stepAway(a.x, a.y, tx, ty);
+    if (step && this.isWalkable(step.x, step.y)) {
+      this.moveAgentTo(a, step.x, step.y);
+      return true;
+    }
+    return this.wanderAgent(a);
   }
 
   moveTowardTarget(a, tx, ty) {
@@ -365,9 +623,15 @@ class World {
   }
 
   wanderBiasChance(a) {
-    if (a.trait === "прожорливый") return 0.52;
-    if (a.trait === "экономный") return 0.22;
+    if (a.trait === TRAIT.GLUTTON) return 0.52;
+    if (a.trait === TRAIT.FRUGAL) return 0.22;
     return 0.35;
+  }
+
+  shouldMoveThisTick(a) {
+    const interval = a.moveInterval || 1;
+    a.movePhase = (a.movePhase || 0) + 1;
+    return a.movePhase % interval === 0;
   }
 
   stepSated(a) {
@@ -375,8 +639,16 @@ class World {
       if (Math.random() < 0.15) this.wanderAgent(a);
       return;
     }
+    if (isWolf(a)) {
+      const other = this.nearestWolf(a.x, a.y, a);
+      if (other && this.distMan(a.x, a.y, other.x, other.y) <= WOLF_SOLITUDE) {
+        this.fleeFrom(a, other.x, other.y);
+        return;
+      }
+    }
+    if (!this.shouldMoveThisTick(a)) return;
     if (Math.random() >= this.wanderBiasChance(a)) return;
-    const dir = a.kind === HERB ? this.seekHerb(a) : this.seekPred(a);
+    const dir = a.kind === HERB || isElk(a) ? this.seekHerb(a) : this.seekPred(a);
     const nx = a.x + dir.x;
     const ny = a.y + dir.y;
     if (this.get(nx, ny) === EMPTY) this.moveAgentTo(a, nx, ny);
@@ -384,9 +656,32 @@ class World {
   }
 
   canHunt(killer, victim) {
-    if (killer.kind === PRED) return victim.kind === HERB && !isKrolDushegub(victim);
-    if (killer.kind === BEAR) return victim.kind === HERB || victim.kind === PRED;
-    if (isKrolDushegub(killer)) return victim.kind === PRED;
+    if (!killer || !victim || killer.dead || victim.dead) return false;
+    if (killer === victim) return false;
+
+    if (isKrolDushegub(killer)) {
+      return victim.kind === HERB || victim.kind === PRED || victim.kind === BEAR;
+    }
+
+    if (isWolf(killer)) {
+      if (victim.kind === BEAR) return false;
+      if (isWolf(victim)) return false;
+      return victim.kind === HERB || victim.kind === PRED;
+    }
+
+    if (killer.kind === BEAR) {
+      return victim.kind === HERB || victim.kind === PRED;
+    }
+
+    if (killer.kind === PRED) {
+      if (isElk(killer)) return false;
+      if (isWolf(victim)) return false;
+      if (victim.kind !== HERB) return false;
+      if (isKrolDushegub(victim)) return false;
+      if (isCow(victim)) return false;
+      return true;
+    }
+
     return false;
   }
 
@@ -399,15 +694,134 @@ class World {
   }
 
   pouncePrey(a, spot) {
-    return this.pounceVictim(a, spot, 7.2);
+    const victim = this.agentAt(spot.x, spot.y);
+    let gain = 7.2;
+    if (victim?.kind === PRED) gain = 8.5;
+    if (isCow(victim)) gain = 12;
+    if (isKoala(victim)) gain = 6.8;
+    if (victim?.kind === BEAR) gain = 14;
+    return this.pounceVictim(a, spot, gain);
   }
 
   feedHungryHerb(a) {
-    const isKrol = a.trait === "крол-душегуб";
+    const aware = this.perceive(a);
+    const moves = isKrolDushegub(a) ? KROL_MOVES_PER_TICK : 1;
 
-    if (isKrol) {
-      const foxTouch = this.findNearestAgent(a.x, a.y, 1, [PRED], a, "touch");
-      if (foxTouch && this.pounceVictim(a, foxTouch, 8.5)) return;
+    for (let m = 0; m < moves; m++) {
+      if (!this.shouldMoveThisTick(a) && !isKrolDushegub(a)) break;
+
+      if (isKrolDushegub(a)) {
+        if (aware.touchPrey) {
+          const gain = aware.touchPrey.agent.kind === BEAR ? 14
+            : aware.touchPrey.agent.kind === PRED ? 8.5 : 7;
+          if (this.pounceVictim(a, aware.touchPrey, gain)) return;
+        }
+        const preySpot = aware.prey[0];
+        if (preySpot) {
+          this.nudgeToward(a, preySpot.x, preySpot.y);
+          const adj = this.findNearestAgent(a.x, a.y, 1, [HERB, PRED, BEAR], a, "touch");
+          if (adj) {
+            const victim = this.agentAt(adj.x, adj.y);
+            const gain = victim?.kind === BEAR ? 14 : victim?.kind === PRED ? 8.5 : 7;
+            if (this.pounceVictim(a, adj, gain)) return;
+          }
+          continue;
+        }
+        this.wanderAgent(a);
+        continue;
+      }
+
+      if (aware.threats.length && (aware.touchThreat || aware.deadEnd)) {
+        const t = aware.threats[0];
+        this.fleeFrom(a, t.x, t.y);
+        continue;
+      }
+
+      const continuing = this.mealFromEating(a);
+      if (continuing) {
+        this.eatPlant(a, continuing);
+        return;
+      }
+      if (a.eating) a.eating = null;
+
+      if (aware.touchFood) {
+        this.startEating(a, aware.touchFood);
+        return;
+      }
+
+      const target = aware.food[0];
+      if (target) {
+        this.nudgeToward(a, target.x, target.y);
+        const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
+        if (after) this.startEating(a, after);
+        return;
+      }
+
+      this.wanderAgent(a);
+    }
+  }
+
+  feedHungryPred(a) {
+    if (isElk(a)) {
+      this.feedHungryElk(a);
+      return;
+    }
+
+    if (isWolf(a)) {
+      this.feedHungryWolf(a);
+      return;
+    }
+
+    const aware = this.perceive(a);
+
+    if (aware.touchPrey) {
+      this.pouncePrey(a, aware.touchPrey);
+      return;
+    }
+
+    const target = aware.prey[0];
+    if (!target) {
+      this.wanderAgent(a);
+      return;
+    }
+
+    this.nudgeToward(a, target.x, target.y);
+    const adj = this.findNearestPrey(a.x, a.y, 1, a, "touch");
+    if (adj) this.pouncePrey(a, adj);
+  }
+
+  feedHungryWolf(a) {
+    const other = this.nearestWolf(a.x, a.y, a);
+    if (other && this.distMan(a.x, a.y, other.x, other.y) <= WOLF_SOLITUDE) {
+      this.fleeFrom(a, other.x, other.y);
+      return;
+    }
+
+    const aware = this.perceive(a);
+    if (aware.touchPrey) {
+      this.pouncePrey(a, aware.touchPrey);
+      return;
+    }
+
+    const target = aware.prey[0];
+    if (!target) {
+      this.wanderAgent(a);
+      return;
+    }
+
+    this.nudgeToward(a, target.x, target.y);
+    const adj = this.findNearestPrey(a.x, a.y, 1, a, "touch");
+    if (adj) this.pouncePrey(a, adj);
+  }
+
+  feedHungryElk(a) {
+    if (!this.shouldMoveThisTick(a)) return;
+
+    const aware = this.perceive(a);
+    if (aware.threats.length && aware.touchThreat) {
+      const t = aware.threats[0];
+      this.fleeFrom(a, t.x, t.y);
+      return;
     }
 
     const continuing = this.mealFromEating(a);
@@ -417,40 +831,30 @@ class World {
     }
     if (a.eating) a.eating = null;
 
-    const touch = this.findNearestEdible(a.x, a.y, 1, "touch");
-    if (touch) {
-      this.startEating(a, touch);
+    if (aware.touchFood) {
+      this.startEating(a, aware.touchFood);
       return;
     }
 
-    const target = this.findNearestEdible(a.x, a.y, a.vision || 7);
+    const target = aware.food[0];
     if (target) {
       this.nudgeToward(a, target.x, target.y);
-      const after = this.findNearestEdible(a.x, a.y, 1, "touch");
+      const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
       if (after) this.startEating(a, after);
       return;
-    }
-
-    if (isKrol) {
-      const fox = this.findNearestAgent(a.x, a.y, a.vision || 8, [PRED], a);
-      if (fox) {
-        this.nudgeToward(a, fox.x, fox.y);
-        const adj = this.findNearestAgent(a.x, a.y, 1, [PRED], a, "touch");
-        if (adj) this.pounceVictim(a, adj, 8.5);
-        return;
-      }
     }
 
     this.wanderAgent(a);
   }
 
   feedHungryBear(a) {
+    const aware = this.perceive(a);
     const preyKinds = [HERB, PRED];
-    const touchPrey = this.findNearestAgent(a.x, a.y, 1, preyKinds, a, "touch");
-    if (touchPrey) {
-      const victim = this.agentAt(touchPrey.x, touchPrey.y);
-      const gain = victim?.kind === PRED ? 9.5 : 6.5;
-      if (this.pounceVictim(a, touchPrey, gain)) return;
+
+    if (aware.touchPrey) {
+      const victim = this.agentAt(aware.touchPrey.x, aware.touchPrey.y);
+      const gain = victim?.kind === PRED ? 9.5 : isCow(victim) ? 11 : 6.5;
+      if (this.pounceVictim(a, aware.touchPrey, gain)) return;
     }
 
     const continuing = this.mealFromEating(a);
@@ -460,9 +864,8 @@ class World {
     }
     if (a.eating) a.eating = null;
 
-    const touch = this.findNearestEdible(a.x, a.y, 1, "touch");
-    if (touch) {
-      this.startEating(a, touch);
+    if (aware.touchFood) {
+      this.startEating(a, aware.touchFood);
       return;
     }
 
@@ -472,39 +875,21 @@ class World {
       const adj = this.findNearestAgent(a.x, a.y, 1, preyKinds, a, "touch");
       if (adj) {
         const victim = this.agentAt(adj.x, adj.y);
-        const gain = victim?.kind === PRED ? 9.5 : 6.5;
+        const gain = victim?.kind === PRED ? 9.5 : isCow(victim) ? 11 : 6.5;
         this.pounceVictim(a, adj, gain);
       }
       return;
     }
 
-    const plant = this.findNearestEdible(a.x, a.y, a.vision || 5);
+    const plant = aware.food[0];
     if (plant) {
       this.nudgeToward(a, plant.x, plant.y);
-      const after = this.findNearestEdible(a.x, a.y, 1, "touch");
+      const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
       if (after) this.startEating(a, after);
       return;
     }
 
     this.wanderAgent(a);
-  }
-
-  feedHungryPred(a) {
-    const touch = this.findNearestPrey(a.x, a.y, 1, a, "touch");
-    if (touch) {
-      this.pouncePrey(a, touch);
-      return;
-    }
-
-    const target = this.findNearestPrey(a.x, a.y, a.vision || 10, a);
-    if (!target) {
-      this.wanderAgent(a);
-      return;
-    }
-
-    this.nudgeToward(a, target.x, target.y);
-    const adj = this.findNearestPrey(a.x, a.y, 1, a, "touch");
-    if (adj) this.pouncePrey(a, adj);
   }
 
   findNeighbor(x, y, type) {
@@ -568,30 +953,68 @@ class World {
 
   defaultsFor(kind) {
     if (kind === BEAR) {
-      return { energy: 22, hue: 28 + Math.random() * 16, vision: 5, drain: 0.36, thresh: 19 };
+      return { energy: 22, hue: 28 + Math.random() * 16, vision: 5, drain: 0.36, thresh: 19, moveInterval: 1 };
     }
     return kind === PRED
-      ? { energy: 10, hue: 350 + Math.random() * 20, vision: 10, drain: 0.48, thresh: 14 }
-      : { energy: 8, hue: 38 + Math.random() * 22, vision: 7, drain: 0.4, thresh: 13 };
+      ? { energy: 10, hue: 350 + Math.random() * 20, vision: 10, drain: 0.48, thresh: 14, moveInterval: 1 }
+      : { energy: 8, hue: 38 + Math.random() * 22, vision: 7, drain: 0.4, thresh: 13, moveInterval: 1 };
   }
 
   makeAgent(x, y, kind, parent) {
     const d = this.defaultsFor(kind);
-    return {
+    const agent = {
       x, y, kind,
       energy: parent ? parent.energy : d.energy,
       hue: parent ? parent.hue : d.hue,
       vision: parent ? parent.vision : d.vision,
       drain: parent ? parent.drain : d.drain,
       thresh: parent ? parent.thresh : d.thresh,
-      trait: parent && parent.trait && parent.trait !== "крол-душегуб" ? parent.trait : null,
+      trait: parent && parent.trait && !isSpecialSpecies(parent) ? parent.trait : null,
       mutated: false,
       gen: parent ? parent.gen + 1 : 0,
       bornGen: null,
       cool: 0,
       dead: false,
-      eating: null
+      eating: null,
+      moveInterval: parent ? (parent.moveInterval || 1) : d.moveInterval,
+      movePhase: 0,
+      stepsSincePoop: 0
     };
+    if (parent && isSpecialSpecies(parent)) {
+      agent.trait = null;
+    }
+    return agent;
+  }
+
+  applySpeciesTrait(baby, trait, x, y) {
+    const cfg = SPECIES_CFG[trait];
+    if (!cfg) return false;
+    baby.trait = trait;
+    baby.energy = cfg.energy;
+    baby.drain = cfg.drain;
+    baby.thresh = cfg.thresh;
+    baby.vision = cfg.vision;
+    baby.hue = cfg.hue + Math.random() * 8;
+    baby.moveInterval = cfg.moveInterval || 1;
+    baby.movesPerTick = cfg.movesPerTick || 1;
+    baby.mutated = true;
+    if (trait === TRAIT.KROL) baby.bornGen = this.generation;
+    this.mutations++;
+    if (baby.kind === HERB) this.mutHerb++;
+    else this.mutPred++;
+    const energy = this.grantMutationEnergy(trait);
+    this.lastMutation = { kind: baby.kind, trait, special: true, x, y, energy };
+    if (trait === TRAIT.KROL) {
+      this.pendingKrolAlert = { energy };
+      this.fx.push({ x, y, color: "#e040fb", t: 2.4, krol: true });
+      this.spark(x, y, "#ff3dff");
+      this.spark(x, y, "#ffffff");
+      this.chime("krol_dushegub");
+    } else {
+      this.chime("mutate");
+      this.spark(x, y, "#7dffc2");
+    }
+    return true;
   }
 
   grantMutationEnergy(trait) {
@@ -609,44 +1032,55 @@ class World {
     return gain;
   }
 
-  tryKrolDushegub(baby, x, y) {
-    if (baby.kind !== HERB || Math.random() >= KROL_CHANCE) return false;
-    baby.trait = "крол-душегуб";
-    baby.vision = Math.max(baby.vision, 8);
-    baby.drain = Math.min(0.72, baby.drain * 1.12);
-    baby.thresh = Math.max(9, baby.thresh - 1);
-    baby.hue = 312;
-    baby.bornGen = this.generation;
-    baby.mutated = true;
-    this.mutations++;
-    this.mutHerb++;
-    const energy = this.grantMutationEnergy("крол-душегуб");
-    this.lastMutation = { kind: HERB, trait: "крол-душегуб", special: true, x, y, energy };
-    this.pendingKrolAlert = { energy };
-    this.fx.push({ x, y, color: "#e040fb", t: 2.4, krol: true });
-    this.spark(x, y, "#ff3dff");
-    this.spark(x, y, "#ffffff");
-    this.chime("krol_dushegub");
-    return true;
+  tryHerbSpeciesMutation(baby, x, y) {
+    if (baby.kind !== HERB) return false;
+    const roll = Math.random();
+    let acc = 0;
+    const order = [
+      [TRAIT.KROL, MUT_CHANCE.krol],
+      [TRAIT.KOALA, MUT_CHANCE.koala],
+      [TRAIT.COW, MUT_CHANCE.cow]
+    ];
+    for (const [trait, base] of order) {
+      acc += this.effectiveChance(base);
+      if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
+    }
+    return false;
+  }
+
+  tryPredSpeciesMutation(baby, x, y) {
+    if (baby.kind !== PRED) return false;
+    const roll = Math.random();
+    let acc = 0;
+    const order = [
+      [TRAIT.WOLF, MUT_CHANCE.wolf],
+      [TRAIT.ELK, MUT_CHANCE.elk]
+    ];
+    for (const [trait, base] of order) {
+      acc += this.effectiveChance(base);
+      if (roll < acc) return this.applySpeciesTrait(baby, trait, x, y);
+    }
+    return false;
   }
 
   applyMutation(baby, parent) {
-    if (baby.trait === "крол-душегуб") return false;
-    if (Math.random() >= this.mutateRate) return false;
+    if (isSpecialSpecies(baby)) return false;
+    const rate = Math.min(1, this.mutateRate * this.mutationMult());
+    if (Math.random() >= rate) return false;
     const roll = Math.random();
     if (roll < 0.34) {
       const up = Math.random() < 0.55;
       baby.vision = Math.max(4, Math.min(12, parent.vision + (up ? 2 : -2)));
-      baby.trait = up ? "зоркий" : "близорукий";
+      baby.trait = up ? TRAIT.KEEN : TRAIT.NEARSIGHTED;
       baby.hue = (parent.hue + (up ? 42 : -28) + 360) % 360;
     } else if (roll < 0.67) {
       baby.drain = Math.max(0.18, Math.min(0.85, parent.drain * 1.3));
       baby.thresh = Math.max(8, parent.thresh - 1);
-      baby.trait = "прожорливый";
+      baby.trait = TRAIT.GLUTTON;
       baby.hue = (parent.hue + 330) % 360;
     } else {
       baby.drain = Math.max(0.16, parent.drain * 0.7);
-      baby.trait = "экономный";
+      baby.trait = TRAIT.FRUGAL;
       baby.hue = (parent.hue + 28) % 360;
     }
     baby.mutated = true;
@@ -728,7 +1162,7 @@ class World {
     } else if (c.herbs && foodPerHerb < 1.2) {
       score = Math.max(18, Math.round(22 + herbSat * 0.2));
       label = "голод";
-      note = "Зайцам мало травы и кустов. Деревья они не едят.";
+      note = "Зайцам мало травы и кустов. Деревья едят только корова и лось.";
     } else if (c.preds && c.herbs && preyPerFox < 1.3) {
       score = 28;
       label = "слишком много лис";
@@ -776,6 +1210,7 @@ class World {
     this.sounds = [];
     this.tickAnimalMetrics();
     this.tickDecays();
+    this.tickFertilizers();
     this.growPlants();
     this.stepAgents();
     this.generation++;
@@ -790,6 +1225,23 @@ class World {
     });
   }
 
+  tickFertilizers() {
+    this.fertilizers = this.fertilizers.filter((f) => {
+      f.ttl--;
+      return f.ttl > 0;
+    });
+  }
+
+  addFertilizer(x, y) {
+    this.fertilizers.push({
+      x, y,
+      ttl: FERTILIZER_CFG.ttl,
+      strength: FERTILIZER_CFG.strength
+    });
+    this.fx.push({ x, y, color: "#8b6914", t: 1.4, fert: true });
+    this.chime("fertilize");
+  }
+
   addDecay(x, y, kind) {
     const cfg = kind === BEAR ? DECAY_CFG.bear : kind === PRED ? DECAY_CFG.pred : DECAY_CFG.herb;
     const color = kind === BEAR ? "#a88458" : kind === PRED ? "#c8a86a" : "#8abf6a";
@@ -801,7 +1253,8 @@ class World {
     if (this.get(x, y) !== EMPTY) return false;
     const wet = !this.arcade && this.countType(x, y, WATER);
     const boost = this.decayBoost(x, y);
-    let p = baseChance + boost;
+    const fert = this.fertilizerBoost(x, y);
+    let p = baseChance * (1 + fert) + boost;
     if (wet) p += 0.03;
     if (Math.random() >= p) return false;
     this.setPlant(x, y, STAGE_GRASS, 0);
@@ -819,7 +1272,8 @@ class World {
         if (this.get(x, y) !== PLANT) continue;
         const i = this.idx(x, y);
         const stage = this.plantStage[i];
-        this.plantAge[i]++;
+        const growth = this.growthMulAt(x, y);
+        this.plantAge[i] += growth;
 
         if (stage === STAGE_GRASS && this.plantAge[i] >= PLANT_CFG.grassToBush) {
           this.setPlant(x, y, STAGE_BUSH, 0);
@@ -828,6 +1282,7 @@ class World {
         } else if (stage === STAGE_BUSH) {
           if (this.plantAge[i] >= PLANT_CFG.bushToTree) {
             this.setPlant(x, y, STAGE_TREE, 0);
+            this.spawnGrassAround(x, y, PLANT_CFG.bushToTreeGrass);
             this.grantEvolutionEnergy();
             this.spark(x, y, "#2a9e50");
             this.chime("evolve_tree");
@@ -836,15 +1291,18 @@ class World {
             for (const [dx, dy] of dirs) {
               if (decaySpawned) break;
               const boost = this.decayBoost(x + dx, y + dy);
+              const fert = this.fertilizerBoost(x + dx, y + dy);
+              const spread = PLANT_CFG.bushSpread * renew * (1 + fert);
               if (boost > 0 && !decaySpawned) {
-                decaySpawned = this.trySpawnGrass(x + dx, y + dy, PLANT_CFG.bushSpread * 0.5 * renew) || decaySpawned;
+                decaySpawned = this.trySpawnGrass(x + dx, y + dy, spread * 0.5) || decaySpawned;
               } else {
-                this.trySpawnGrass(x + dx, y + dy, PLANT_CFG.bushSpread * renew);
+                this.trySpawnGrass(x + dx, y + dy, spread);
               }
             }
           }
         } else if (stage === STAGE_TREE && this.plantAge[i] >= PLANT_CFG.treeLife) {
           this.clearPlant(x, y);
+          this.spawnGrassAt(x, y);
           this.chime("wilt");
         }
       }
@@ -852,7 +1310,7 @@ class World {
   }
 
   seekHerb(a) {
-    const target = this.findNearestEdible(a.x, a.y, a.vision || 7);
+    const target = this.findNearestEdible(a.x, a.y, a.vision || 7, "scout", a);
     if (!target) {
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
       const d = dirs[Math.floor(Math.random() * 4)];
@@ -878,7 +1336,7 @@ class World {
   eatPlant(a, meal) {
     const i = this.idx(meal.x, meal.y);
     const stage = this.plantStage[i];
-    const mult = a.kind === BEAR ? 0.82 : 1;
+    const mult = a.kind === BEAR ? 0.82 : isKoala(a) ? 0.9 : 1;
     if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
       const perBite = stage === STAGE_GRASS
         ? PLANT_CFG.grassEnergy / PLANT_CFG.grassBites
@@ -892,8 +1350,35 @@ class World {
         a.eating = null;
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
+    } else if (stage === STAGE_TREE && (isCow(a) || isElk(a))) {
+      this.plantBites[i]--;
+      a.energy += PLANT_CFG.treeEnergyPerBite;
+      if (this.plantBites[i] <= 0) {
+        this.clearPlant(meal.x, meal.y);
+        this.spawnGrassAt(meal.x, meal.y);
+        a.eating = null;
+      } else if (a.energy >= a.thresh) {
+        a.eating = null;
+      }
+      this.chime("eat_tree");
     }
     this.spark(meal.x, meal.y, "#ffc14d");
+  }
+
+  spawnKrolLegacy(a) {
+    this.chime("krol_roar");
+    this.fx.push({ x: a.x, y: a.y, color: "#e040fb", t: 2.8, krol: true });
+    this.spark(a.x, a.y, "#ff66ff");
+    this.spark(a.x, a.y, "#ffffff");
+    for (let i = 0; i < KROL_DEATH_SPAWN; i++) {
+      const spot = this.findNeighbor(a.x, a.y, EMPTY);
+      if (!spot) break;
+      const baby = this.makeAgent(spot.x, spot.y, HERB);
+      this.set(spot.x, spot.y, HERB);
+      this.agents.push(baby);
+      this.births++;
+      this.chime("birth");
+    }
   }
 
   killAgent(victim, killer, energyGain) {
@@ -904,7 +1389,7 @@ class World {
     this.addDecay(victim.x, victim.y, victim.kind);
     killer.energy += gain;
     this.spark(killer.x, killer.y, "#ff5d7a");
-    if (killer.trait === "крол-душегуб" && victim.kind === PRED) {
+    if (isKrolDushegub(killer)) {
       this.chime("krol_hunt");
     } else if (killer.kind === BEAR) {
       this.chime("bear_hunt");
@@ -918,6 +1403,7 @@ class World {
   }
 
   dieAgent(a, reason) {
+    if (isKrolDushegub(a)) this.spawnKrolLegacy(a);
     a.dead = true;
     this.set(a.x, a.y, EMPTY);
     this.deaths++;
@@ -936,6 +1422,12 @@ class World {
     this.chime("decay");
   }
 
+  litterSize(a) {
+    if (isKoala(a)) return 2;
+    if (isCow(a)) return 1;
+    return 1;
+  }
+
   stepAgents() {
     const order = this.agents.filter((a) => !a.dead);
     for (let i = order.length - 1; i > 0; i--) {
@@ -948,9 +1440,14 @@ class World {
     for (const a of order) {
       if (a.dead) continue;
 
-      if (a.trait === "крол-душегуб" && a.bornGen != null && this.generation - a.bornGen >= KROL_LIFESPAN) {
+      if (isKrolDushegub(a) && a.bornGen != null && this.generation - a.bornGen >= KROL_LIFESPAN) {
         this.dieAgent(a, "krol_burnout");
         continue;
+      }
+
+      if (isElk(a) && (a.stepsSincePoop || 0) >= ELK_POOP_INTERVAL) {
+        this.addFertilizer(a.x, a.y);
+        a.stepsSincePoop = 0;
       }
 
       a.energy -= a.drain;
@@ -976,7 +1473,7 @@ class World {
 
       if (a.dead) continue;
 
-      if (a.kind !== BEAR && a.energy >= a.thresh && a.cool <= 0) {
+      if (a.kind !== BEAR && !isElk(a) && a.energy >= a.thresh && a.cool <= 0) {
         let breedChance = 1;
         if (a.kind === HERB && c.herbs > 0) {
           const edible = c.grass + c.bush * 0.6;
@@ -984,7 +1481,7 @@ class World {
           else if (c.herbs > edible * 0.55) breedChance = 0.55;
         }
         if (Math.random() < breedChance) {
-          const litter = a.trait === "крол-душегуб" ? KROL_LITTER : 1;
+          const litter = this.litterSize(a);
           let bred = false;
           for (let n = 0; n < litter; n++) {
             const spot = this.findNeighbor(a.x, a.y, EMPTY);
@@ -998,7 +1495,9 @@ class World {
             baby.energy = a.energy;
             baby.cool = a.cool;
             if (baby.kind === HERB) {
-              if (!this.tryKrolDushegub(baby, spot.x, spot.y)) this.applyMutation(baby, a);
+              if (!this.tryHerbSpeciesMutation(baby, spot.x, spot.y)) this.applyMutation(baby, a);
+            } else if (baby.kind === PRED) {
+              if (!this.tryPredSpeciesMutation(baby, spot.x, spot.y)) this.applyMutation(baby, a);
             } else {
               this.applyMutation(baby, a);
             }
@@ -1042,6 +1541,9 @@ window.World = World;
 window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
 window.PLANT_CFG = PLANT_CFG;
 window.KROL_LIFESPAN = KROL_LIFESPAN;
+window.TRAIT = TRAIT;
+window.SPECIES_CFG = SPECIES_CFG;
+window.MUT_CHANCE = MUT_CHANCE;
 window.ARCADE_STALE_AFTER = ARCADE_STALE_AFTER;
 window.ARCADE_LONELY_MAX = ARCADE_LONELY_MAX;
 window.CHAIN_SUSTAIN_GENS = CHAIN_SUSTAIN_GENS;

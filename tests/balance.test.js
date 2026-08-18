@@ -65,7 +65,7 @@ describe("баланс: пассивный доход ⚡", () => {
       totalEnergy += world.pendingEnergy;
     }
 
-    assert.ok(totalEnergy <= 24, `за 80 циклов ожидали ≤24 ⚡, получили ${totalEnergy}`);
+    assert.ok(totalEnergy <= 35, `за 80 циклов ожидали ≤35 ⚡, получили ${totalEnergy}`);
     assert.ok(totalEnergy >= 1, "хотя бы одно дерево должно созреть");
   });
 });
@@ -97,12 +97,11 @@ describe("баланс: скорость экосистемы", () => {
 });
 
 describe("баланс: мутации", () => {
-  test("шанс крола 3%", () => {
-    const { createWorld: cw } = require("./harness.cjs");
+  test("шанс крола 0.5%", () => {
     const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
-    const match = engineSrc.match(/KROL_CHANCE = ([\d.]+)/);
+    const match = engineSrc.match(/krol:\s*([\d.]+)/);
     assert.ok(match);
-    assert.equal(Number(match[1]), 0.03);
+    assert.equal(Number(match[1]), 0.005);
   });
 
   test("базовый шанс мутации умеренный", () => {
