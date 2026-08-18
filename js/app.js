@@ -13,10 +13,11 @@
     playing: false,
     started: false,
     speed: 0,
-    speedLabels: ["×2", "×3", "×5", "×10"],
-    speedTicks: [0.67, 1, 1.67, 3.33],
+    speedLabels: ["×1", "×2", "×3", "×5", "×10"],
+    speedTicks: [0.33, 0.67, 1, 1.67, 3.33],
     world: null,
     painting: false,
+    lastPaintCell: null,
     inspect: null,
     gameEnded: false,
     krolResumePlaying: false,
@@ -224,8 +225,8 @@
     app.playing = false;
     $("btn-play").textContent = "▶ Старт";
 
-    const desc = LIFE_DATA.speciesHelp["крол-душегуб"] || "охотится на всех зверей";
-    $("krol-overlay-desc").textContent = `${desc}. Живёт недолго, но приносит троих детёнышей.`;
+    const desc = LIFE_DATA.speciesHelp["крол-душегуб"] || "2×2, жрёт всё вокруг";
+    $("krol-overlay-desc").textContent = `${desc}. Живёт 15 циклов, оставляет 3 зайцев.`;
     const bonusEl = $("krol-overlay-bonus");
     if (bonus) {
       bonusEl.textContent = `Награда:${bonus}`;
@@ -475,6 +476,21 @@
     app.cell = s;
   }
 
+  function isAnimalTool(tool = app.tool) {
+    return tool === "herb" || tool === "pred" || tool === "bear";
+  }
+
+  function krolCellKeys(w) {
+    const keys = new Set();
+    for (const a of w.agents) {
+      if (a.dead || a.trait !== "крол-душегуб") continue;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) keys.add(`${a.x + dx},${a.y + dy}`);
+      }
+    }
+    return keys;
+  }
+
   function cellFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
     const pt = e.touches ? e.touches[0] : e;
@@ -501,12 +517,15 @@
       updateStats();
       return;
     }
+    const cellKey = `${app.tool}:${x},${y}`;
+    if (app.lastPaintCell === cellKey) return;
     if (!canPaint()) {
       toast("Не хватает энергии");
       return;
     }
     const cost = toolCost(app.tool);
     const ok = app.world.paint(x, y, app.tool);
+    if (ok) app.lastPaintCell = cellKey;
     if (ok && cost > 0) {
       app.energy -= cost;
       updateEnergy();
@@ -558,10 +577,13 @@
 
     drawDecays(w, s);
 
+    const krolMask = krolCellKeys(w);
+
     for (let y = 0; y < w.h; y++) {
       for (let x = 0; x < w.w; x++) {
         const t = w.get(x, y);
         if (t === T.EMPTY) continue;
+        if (krolMask.has(`${x},${y}`)) continue;
         if (t === T.WALL) {
           if (w.dish && !w.inDish(x, y)) {
             ctx.fillStyle = "#0a1820";
@@ -578,20 +600,30 @@
     }
 
     for (const a of w.agents) {
-      if (a.dead) continue;
+      if (a.dead || a.trait === "крол-душегуб") continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
       const icon = agentIcon(a);
-      const scale = a.trait === "крол-душегуб" ? 1.08
-        : a.trait === "корова" ? 1.05
+      const scale = a.trait === "корова" ? 1.05
         : a.trait === "лось" ? 1.02
         : 0.88 + 0.1 * sat;
       drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
     }
 
+    for (const a of w.agents) {
+      if (a.dead || a.trait !== "крол-душегуб") continue;
+      const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
+      drawSpanEmoji(agentIcon(a), a.x, a.y, 2, s, 0.45 + 0.55 * sat);
+    }
+
     if (app.inspect) {
+      const inspected = w.agentAt(app.inspect.x, app.inspect.y);
       ctx.strokeStyle = "#7dffc2";
       ctx.lineWidth = 2;
-      ctx.strokeRect(app.inspect.x * s + 1, app.inspect.y * s + 1, s - 2, s - 2);
+      if (inspected?.trait === "крол-душегуб") {
+        ctx.strokeRect(inspected.x * s + 1, inspected.y * s + 1, s * 2 - 2, s * 2 - 2);
+      } else {
+        ctx.strokeRect(app.inspect.x * s + 1, app.inspect.y * s + 1, s - 2, s - 2);
+      }
     }
 
     if (w.dish) {
@@ -627,6 +659,21 @@
       }
       ctx.globalAlpha = 1;
     }
+  }
+
+  function drawSpanEmoji(emoji, x, y, span, s, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const cx = (x + span / 2) * s;
+    const cy = (y + span / 2) * s;
+    const fontSize = Math.max(12, Math.floor(s * 0.92));
+    ctx.font = `${fontSize}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.translate(cx, cy);
+    ctx.scale(span * 0.95, span * 0.95);
+    ctx.fillText(emoji, 0, 0);
+    ctx.restore();
   }
 
   function drawEmoji(emoji, x, y, s, alpha = 1, scale = 1) {
@@ -715,7 +762,7 @@
       }
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
         : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
-        : a.trait === "крол-душегуб" ? `быстрый (×3), восприятие ${a.vision} кл.`
+        : a.trait === "крол-душегуб" ? `2×2, зона разрушения 4×4, ×6 действий/цикл, восприятие ${a.vision} кл.`
         : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
         : `восприятие ${a.vision} кл.`;
       return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}`;
@@ -873,12 +920,32 @@
     }
   }
 
-  canvas.addEventListener("mousedown", (e) => { app.painting = true; paintAt(e); });
-  canvas.addEventListener("mousemove", (e) => { if (app.painting) paintAt(e); });
-  window.addEventListener("mouseup", () => { app.painting = false; });
-  canvas.addEventListener("touchstart", (e) => { e.preventDefault(); app.painting = true; paintAt(e); }, { passive: false });
-  canvas.addEventListener("touchmove", (e) => { e.preventDefault(); if (app.painting) paintAt(e); }, { passive: false });
-  canvas.addEventListener("touchend", () => { app.painting = false; });
+  canvas.addEventListener("mousedown", (e) => {
+    app.painting = true;
+    app.lastPaintCell = null;
+    paintAt(e);
+  });
+  canvas.addEventListener("mousemove", (e) => {
+    if (app.painting && !isAnimalTool()) paintAt(e);
+  });
+  window.addEventListener("mouseup", () => {
+    app.painting = false;
+    app.lastPaintCell = null;
+  });
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    app.painting = true;
+    app.lastPaintCell = null;
+    paintAt(e);
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    if (app.painting && !isAnimalTool()) paintAt(e);
+  }, { passive: false });
+  canvas.addEventListener("touchend", () => {
+    app.painting = false;
+    app.lastPaintCell = null;
+  });
 
   $("btn-arcade").onclick = () => { LifeSound.play("ui"); renderDifficulty(); showScreen("screen-difficulty"); };
   $("btn-sandbox").onclick = () => { LifeSound.play("ui"); startSandbox(); };

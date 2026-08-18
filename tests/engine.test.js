@@ -1,6 +1,6 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createWorld } = require("./harness.cjs");
+const { createWorld, placeKrol } = require("./harness.cjs");
 
 describe("поедание растений", () => {
   test("трава съедается за 2 укуса с соседней клетки", () => {
@@ -351,13 +351,11 @@ describe("аркада: конец раунда", () => {
 describe("крол-душегуб", () => {
   test("охотится даже когда сыт", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
-    world.set(3, 2, T.HERB);
-    const prey = world.makeAgent(3, 2, T.HERB);
+    world.set(4, 2, T.HERB);
+    const prey = world.makeAgent(4, 2, T.HERB);
     prey.trait = "коала";
     world.agents = [krol, prey];
     world.feedKrolDushegub(krol);
@@ -366,77 +364,116 @@ describe("крол-душегуб", () => {
 
   test("ест растения если нет добычи", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 5;
     krol.thresh = 12;
     world.agents = [krol];
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("ест дерево если звери не рядом", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
-    world.setPlant(3, 2, T.STAGE_TREE, 0);
+    world.setPlant(4, 2, T.STAGE_TREE, 0);
     world.set(10, 2, T.HERB);
     const far = world.makeAgent(10, 2, T.HERB);
     world.agents = [krol, far];
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 4);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("охотится только на зверей рядом", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 20;
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.set(6, 2, T.HERB);
     const prey = world.makeAgent(6, 2, T.HERB);
     prey.trait = "коала";
     world.agents = [krol, prey];
     world.feedKrolDushegub(krol);
     assert.equal(prey.dead, false);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("не перестаёт есть будучи сыт", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 50;
     krol.thresh = 12;
     world.agents = [krol];
-    world.setPlant(3, 2, T.STAGE_GRASS, 0);
+    world.setPlant(4, 2, T.STAGE_GRASS, 0);
     world.feedKrolDushegub(krol);
-    assert.ok(world.plantBites[world.idx(3, 2)] < 2);
+    assert.equal(world.get(4, 2), T.EMPTY);
   });
 
   test("может съесть волка", () => {
     const { world, T } = createWorld();
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.energy = 20;
-    world.set(3, 2, T.PRED);
-    const wolf = world.makeAgent(3, 2, T.PRED);
+    world.set(4, 2, T.PRED);
+    const wolf = world.makeAgent(4, 2, T.PRED);
     wolf.trait = "волк";
     world.agents = [krol, wolf];
     world.feedKrolDushegub(krol);
     assert.equal(wolf.dead, true);
   });
 
+  test("съедает всё в зоне 4×4 за один раз", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    world.setPlant(3, 4, T.STAGE_GRASS, 0);
+    world.setPlant(6, 4, T.STAGE_BUSH, 0);
+    world.setPlant(4, 3, T.STAGE_GRASS, 0);
+    world.setPlant(5, 5, T.STAGE_TREE, 0);
+    world.set(6, 6, T.HERB);
+    const prey = world.makeAgent(6, 6, T.HERB);
+    world.agents.push(prey);
+    world.krolDevourZone(krol);
+    assert.equal(prey.dead, true);
+    assert.equal(world.get(3, 4), T.EMPTY);
+    assert.equal(world.get(6, 4), T.EMPTY);
+    assert.equal(world.get(4, 3), T.EMPTY);
+    assert.equal(world.get(5, 5), T.EMPTY);
+  });
+
+  test("6 действий за цикл и зона разрушения в симуляции", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 8, 8, T);
+    krol.movesPerTick = 6;
+    world.set(10, 8, T.HERB);
+    const prey1 = world.makeAgent(10, 8, T.HERB);
+    world.set(12, 8, T.HERB);
+    const prey2 = world.makeAgent(12, 8, T.HERB);
+    world.setPlant(9, 9, T.STAGE_GRASS, 0);
+    world.setPlant(10, 9, T.STAGE_BUSH, 0);
+    world.agents = [krol, prey1, prey2];
+    world.feedKrolDushegub(krol);
+    assert.ok(prey1.dead || prey2.dead || world.get(9, 9) === T.EMPTY || world.get(10, 9) === T.EMPTY);
+    assert.equal(krol.movesPerTick, 6);
+  });
+
+  test("проходит сквозь зверей, съедая их", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.set(6, 4, T.HERB);
+    const prey = world.makeAgent(6, 4, T.HERB);
+    world.agents = [krol, prey];
+    assert.ok(world.canAgentMoveTo(krol, 5, 4));
+    world.moveAgentTo(krol, 5, 4);
+    assert.equal(prey.dead, true);
+    assert.equal(krol.x, 5);
+    assert.equal(krol.y, 4);
+  });
+
   test("после смерти оставляет 3 зайцев", () => {
     const { world, T, KROL_LIFESPAN } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.bornGen = 0;
     krol.energy = 20;
     krol.thresh = 10;
@@ -450,12 +487,10 @@ describe("крол-душегуб", () => {
 
   test("никто не может убить крол-душегуба", () => {
     const { world, T } = createWorld();
-    world.set(5, 5, T.HERB);
-    const krol = world.makeAgent(5, 5, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 5, 5, T);
     krol.energy = 1;
-    world.set(6, 5, T.BEAR);
-    const bear = world.makeAgent(6, 5, T.BEAR);
+    world.set(8, 5, T.BEAR);
+    const bear = world.makeAgent(8, 5, T.BEAR);
     world.set(4, 5, T.PRED);
     const fox = world.makeAgent(4, 5, T.PRED);
     world.agents = [krol, bear, fox];
@@ -467,9 +502,7 @@ describe("крол-душегуб", () => {
 
   test("не умирает от голода", () => {
     const { world, T } = createWorld();
-    world.set(2, 2, T.HERB);
-    const krol = world.makeAgent(2, 2, T.HERB);
-    krol.trait = "крол-душегуб";
+    const krol = placeKrol(world, 2, 2, T);
     krol.bornGen = 0;
     krol.energy = 0.1;
     krol.thresh = 12;
@@ -481,10 +514,77 @@ describe("крол-душегуб", () => {
 
   test("не наследуется потомкам", () => {
     const { world, T } = createWorld();
-    const parent = world.makeAgent(0, 0, T.HERB);
-    parent.trait = "крол-душегуб";
-    const baby = world.makeAgent(1, 0, T.HERB, parent);
+    const parent = placeKrol(world, 0, 0, T);
+    const baby = world.makeAgent(3, 0, T.HERB, parent);
     assert.notEqual(baby.trait, "крол-душегуб");
+  });
+
+  test("при рождении занимает 2×2 вокруг родителя и съедает содержимое", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    parent.energy = 20;
+    parent.thresh = 13;
+    world.set(5, 5, T.HERB);
+    world.setPlant(6, 5, T.STAGE_GRASS, 0);
+    world.setPlant(5, 6, T.STAGE_BUSH, 0);
+    world.set(7, 5, T.HERB);
+    const snack = world.makeAgent(7, 5, T.HERB);
+    world.agents = [parent, snack];
+
+    const baby = world.makeAgent(4, 5, T.HERB, parent);
+    baby.trait = "крол-душегуб";
+    assert.ok(world.birthKrolAroundParent(baby, parent));
+
+    const footprint = [
+      { x: baby.x, y: baby.y },
+      { x: baby.x + 1, y: baby.y },
+      { x: baby.x, y: baby.y + 1 },
+      { x: baby.x + 1, y: baby.y + 1 }
+    ];
+    const nearParent = footprint.some((c) =>
+      Math.max(Math.abs(c.x - parent.x), Math.abs(c.y - parent.y)) <= 1
+    );
+    assert.ok(nearParent);
+    for (const c of footprint) {
+      assert.equal(world.get(c.x, c.y), T.HERB);
+    }
+    assert.equal(parent.dead, false);
+    if (footprint.some((c) => c.x === 7 && c.y === 5)) assert.equal(snack.dead, true);
+  });
+});
+
+describe("размещение животных", () => {
+  test("нельзя поставить зайца на занятую клетку", () => {
+    const { world, T } = createWorld();
+    world.set(3, 3, T.HERB);
+    world.agents.push(world.makeAgent(3, 3, T.HERB));
+    assert.equal(world.paint(3, 3, "herb"), false);
+    assert.equal(world.agents.filter((a) => !a.dead && a.kind === T.HERB).length, 1);
+  });
+
+  test("нельзя поставить на клетку крол-душегуба", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    assert.equal(world.paint(5, 4, "herb"), false);
+    assert.equal(world.paint(4, 5, "pred"), false);
+    assert.equal(world.paint(2, 2, "herb"), true);
+  });
+
+  test("крол-душегуб проходит через растения", () => {
+    const { world, T } = createWorld();
+    const krol = placeKrol(world, 4, 4, T);
+    world.agents = [krol];
+    world.setPlant(6, 4, T.STAGE_GRASS, 0);
+    world.setPlant(6, 5, T.STAGE_BUSH, 0);
+    world.setPlant(5, 6, T.STAGE_TREE, 0);
+    world.setPlant(6, 6, T.STAGE_GRASS, 0);
+    assert.ok(world.canAgentMoveTo(krol, 5, 4));
+    world.moveAgentTo(krol, 5, 4);
+    assert.equal(krol.x, 5);
+    assert.equal(krol.y, 4);
+    assert.equal(world.get(6, 4), T.HERB);
+    assert.equal(world.get(6, 5), T.HERB);
   });
 });
 

@@ -111,29 +111,31 @@ describe("баланс: мутации", () => {
     assert.equal(Number(match[1]), 0.02);
   });
 
-  test("буст мутации: 30% от базового шанса за каждый цикл мира", () => {
+  test("буст мутации: ×2 за каждое поколение существа", () => {
     const { world } = createWorld();
-    world.generation = 0;
-    assert.equal(world.effectiveChance(0.02), 0.02);
-    world.generation = 1;
-    assert.ok(Math.abs(world.effectiveChance(0.02) - 0.026) < 1e-12);
-    world.generation = 10;
-    assert.ok(Math.abs(world.effectiveChance(0.02) - 0.08) < 1e-12);
+    assert.equal(world.effectiveChance(0.02, 1), 0.02);
+    assert.ok(Math.abs(world.effectiveChance(0.02, 2) - 0.04) < 1e-12);
+    assert.ok(Math.abs(world.effectiveChance(0.02, 5) - 0.32) < 1e-12);
   });
 
-  test("буст не добавляет абсолютные процентные пункты", () => {
+  test("поколение 3: крол 0.25% × 4 = 1%", () => {
     const { world } = createWorld();
-    world.generation = 5;
-    const base = 0.0025;
-    const effective = world.effectiveChance(base);
-    assert.ok(Math.abs(effective - base * (1 + 0.3 * 5)) < 1e-12);
-    assert.ok(effective < 0.01);
+    const effective = world.effectiveChance(0.0025, 3);
+    assert.ok(Math.abs(effective - 0.01) < 1e-12);
   });
 
-  test("крол на 4-м цикле: 0.25% × 2.2 ≈ 0.55%", () => {
-    const { world } = createWorld();
-    world.generation = 4;
-    const effective = world.effectiveChance(0.0025);
-    assert.ok(Math.abs(effective - 0.0025 * 2.2) < 1e-12);
+  test("посаженный зверь — поколение 1, потомок — +1", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(0, 0, T.HERB);
+    const baby = world.makeAgent(1, 0, T.HERB, parent);
+    assert.equal(parent.gen, 1);
+    assert.equal(baby.gen, 2);
+  });
+
+  test("крол-душегуб: 6 действий за цикл", () => {
+    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
+    const match = engineSrc.match(/KROL_MOVES_PER_TICK\s*=\s*(\d+)/);
+    assert.ok(match);
+    assert.equal(Number(match[1]), 6);
   });
 });

@@ -23,6 +23,7 @@ function createWorld(w = 24, h = 24) {
     T: ctx.LIFE_TYPES,
     PLANT_CFG: ctx.PLANT_CFG,
     KROL_LIFESPAN: ctx.KROL_LIFESPAN,
+    KROL_MOVES_PER_TICK: ctx.KROL_MOVES_PER_TICK,
     ARCADE_STALE_AFTER: ctx.ARCADE_STALE_AFTER,
     ARCADE_LONELY_MAX: ctx.ARCADE_LONELY_MAX,
     CHAIN_SUSTAIN_GENS: ctx.CHAIN_SUSTAIN_GENS,
@@ -30,4 +31,11 @@ function createWorld(w = 24, h = 24) {
   };
 }
 
-module.exports = { loadEngine, createWorld };
+function placeKrol(world, x, y, T) {
+  const krol = world.makeAgent(x, y, T.HERB);
+  krol.trait = "крол-душегуб";
+  world.occupyAgentCells(krol);
+  return krol;
+}
+
+module.exports = { loadEngine, createWorld, placeKrol };
