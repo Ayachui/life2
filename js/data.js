@@ -4,7 +4,7 @@ const LIFE_DATA = {
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
   // major 1.0.0   — стабильный релиз (stage: "release")
   // stage: "alpha" | "beta" | "release"
-  gameVersion: { stage: "alpha", major: 0, minor: 6, patch: 0 },
+  gameVersion: { stage: "alpha", major: 0, minor: 6, patch: 3 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -51,7 +51,7 @@ const LIFE_DATA = {
     { id: "easy", label: "Лёгкий", energy: 1000, emoji: "🌿" },
     { id: "medium", label: "Средний", energy: 500, emoji: "🌾" },
     { id: "hard", label: "Сложный", energy: 250, emoji: "🔥" },
-    { id: "hardcore", label: "Хардкор", energy: 115, emoji: "💀" }
+    { id: "hardcore", label: "Хардкор", energy: 134, emoji: "💀" }
   ],
   tutorial: [
     {

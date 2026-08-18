@@ -8,7 +8,7 @@ const PLANT_CFG = {
   grassToBush: 10,
   bushToTree: 28,
   treeLife: 75,
-  bushSpread: 0.04,
+  bushSpread: 0.055,
   grassBites: 2,
   bushBites: 4,
   grassEnergy: 3.5,
@@ -181,9 +181,26 @@ class World {
   }
 
   checkArcadeEnd(energy, herbCost) {
-    if (!this.arcade || this.gameOver || this.sustainedChain) return;
+    if (!this.arcade || this.gameOver) return;
     if (this.hasAnimals()) return;
     const broke = energy < herbCost;
+
+    // Полное вымирание (нет ни зверей, ни растений) — конец даже после устойчивой цепочки
+    if (!this.isAlive()) {
+      if (this.lonelyGens >= ARCADE_LONELY_MAX) {
+        this.gameOver = true;
+        this.gameOverReason = "no_chain";
+        return;
+      }
+      if (broke && this.noAnimalGens >= ARCADE_STALE_AFTER) {
+        this.gameOver = true;
+        this.gameOverReason = "no_chain";
+        return;
+      }
+    }
+
+    if (this.sustainedChain) return;
+
     if (this.lonelyGens >= ARCADE_LONELY_MAX) {
       this.gameOver = true;
       this.gameOverReason = "no_chain";

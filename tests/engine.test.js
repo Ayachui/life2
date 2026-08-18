@@ -132,6 +132,7 @@ describe("эволюция кустов", () => {
   test("куст за жизнь до дерева обычно сеет траву", () => {
     const { T, PLANT_CFG } = createWorld(12, 12);
     let successes = 0;
+    let totalGrass = 0;
     const trials = 24;
     for (let t = 0; t < trials; t++) {
       const w = createWorld(12, 12).world;
@@ -143,9 +144,12 @@ describe("эволюция кустов", () => {
           if (w.plantStageAt(x, y) === T.STAGE_GRASS) grass++;
         }
       }
+      totalGrass += grass;
       if (grass >= 1) successes++;
     }
-    assert.ok(successes >= trials * 0.6, `кусты сеют редко: ${successes}/${trials}`);
+    const avgGrass = totalGrass / trials;
+    assert.ok(successes >= trials * 0.9, `кусты сеют редко: ${successes}/${trials}`);
+    assert.ok(avgGrass >= 2, `мало соседней травы от куста: ${avgGrass.toFixed(2)}`);
   });
 
   test("без зверей куст успевает созреть до дерева", () => {
@@ -289,13 +293,25 @@ describe("аркада: конец раунда", () => {
     assert.equal(world.gameOverReason, "no_chain");
   });
 
-  test("устойчивая цепочка снимает лимит", () => {
-    const { world } = createWorld();
+  test("устойчивая цепочка снимает лимит при живом лесе", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
+    world.setPlant(5, 5, T.STAGE_GRASS, 0);
     world.lonelyGens = 200;
     world.sustainedChain = true;
     world.checkArcadeEnd(0, 45);
     assert.equal(world.gameOver, false);
+  });
+
+  test("устойчивая цепочка не спасает от полного вымирания", () => {
+    const { world, ARCADE_LONELY_MAX } = createWorld();
+    world.arcade = true;
+    world.sustainedChain = true;
+    world.lonelyGens = ARCADE_LONELY_MAX;
+    world.noAnimalGens = ARCADE_LONELY_MAX;
+    world.checkArcadeEnd(6, 45);
+    assert.equal(world.gameOver, true);
+    assert.equal(world.gameOverReason, "no_chain");
   });
 
   test("без энергии на зайца и 40+ пустых циклов — конец", () => {

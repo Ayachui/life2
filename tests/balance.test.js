@@ -65,7 +65,7 @@ describe("баланс: пассивный доход ⚡", () => {
       totalEnergy += world.pendingEnergy;
     }
 
-    assert.ok(totalEnergy <= 22, `за 80 циклов ожидали ≤22 ⚡, получили ${totalEnergy}`);
+    assert.ok(totalEnergy <= 24, `за 80 циклов ожидали ≤24 ⚡, получили ${totalEnergy}`);
     assert.ok(totalEnergy >= 1, "хотя бы одно дерево должно созреть");
   });
 });

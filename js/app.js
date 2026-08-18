@@ -17,7 +17,8 @@
     painting: false,
     inspect: null,
     gameEnded: false,
-    krolResumePlaying: false
+    krolResumePlaying: false,
+    resumeGameOverAfterModal: false
   };
 
   const canvas = $("world");
@@ -84,15 +85,27 @@
   }
 
   function openModal(html, wide) {
+    hideGameOverOverlay();
+    dismissKrolOverlay(false);
     $("modal-card").innerHTML = html;
     $("modal-card").classList.toggle("wide", !!wide);
     $("modal").classList.remove("hidden");
   }
   function closeModal() {
-    if (app.gameEnded) return;
     $("modal").classList.add("hidden");
     $("modal-card").classList.remove("wide");
     $("modal-card").classList.remove("krol-alert");
+    if (app.resumeGameOverAfterModal && app.gameEnded && app.gameType === "arcade" && app.world) {
+      app.resumeGameOverAfterModal = false;
+      const title = app.world.gameOverReason === "no_chain"
+        ? "Лесу не хватило живых зверей"
+        : "Экосистема остановилась";
+      showGameOverOverlay(title, app.world.generation, app.difficulty);
+    }
+  }
+
+  function isModalOpen() {
+    return !$("modal").classList.contains("hidden");
   }
 
   function isGameOverOverlayOpen() {
@@ -254,6 +267,7 @@
     app.started = false;
     app.gameEnded = false;
     app.krolResumePlaying = false;
+    app.resumeGameOverAfterModal = false;
     dismissKrolOverlay(false);
     hideGameOverOverlay();
     app.inspect = null;
@@ -270,6 +284,19 @@
     world.arcade = gameType === "arcade";
     app.world = world;
 
+    if (gameType === "arcade" && difficulty?.id === "hardcore") {
+      const cx = Math.floor(world.w / 2);
+      const cy = Math.floor(world.h / 2);
+      const ring = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const [dx, dy] of ring) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (world.inDish(x, y) && world.get(x, y) === LIFE_TYPES.EMPTY) {
+          world.setPlant(x, y, LIFE_TYPES.STAGE_GRASS, 0);
+        }
+      }
+    }
+
     $("btn-play").textContent = "▶ Старт";
     $("energy-pill").classList.toggle("hidden", gameType !== "arcade");
 
@@ -278,7 +305,9 @@
       $("game-subtitle").textContent = difficulty.label;
       $("hud-goal-title").textContent = "Цель";
       $("hud-goal").textContent = `Продержись как можно дольше. Энергия на старт: ${difficulty.energy} ⚡`;
-      $("hud-hint").textContent = "Держи стаю зайцев живой 25 ходов подряд. За деревья и особых зверей дают энергию.";
+      $("hud-hint").textContent = difficulty.id === "hardcore"
+        ? "На старте в центре уже растёт трава. Держи стаю зайцев живой 25 ходов подряд — за деревья и особых зверей дают энергию."
+        : "Держи стаю зайцев живой 25 ходов подряд. За деревья и особых зверей дают энергию.";
     } else {
       $("game-title").textContent = "Песочница";
       $("game-subtitle").textContent = "Свободный опыт";
@@ -618,7 +647,8 @@
     return [2, 4, 7, 11, 16][app.speed - 1];
   }
 
-  async function showLeaderboard() {
+  async function showLeaderboard(resumeGameOver = false) {
+    app.resumeGameOverAfterModal = resumeGameOver;
     const { scores, source } = await LifeLeaderboard.fetchScores();
     const rows = scores.length
       ? scores.map((s, i) => {
@@ -638,9 +668,8 @@
         <thead><tr><th>#</th><th>Имя</th><th>Ходы</th><th>Сложность</th><th>Дата</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="modal-actions"><button class="btn primary" id="lb-close">Закрыть</button></div>
+      <div class="modal-actions"><button class="btn primary" type="button" id="lb-close">Закрыть</button></div>
     `, true);
-    $("lb-close").onclick = closeModal;
   }
 
   function escapeHtml(s) {
@@ -751,10 +780,13 @@
   $("btn-diff-back").onclick = () => showScreen("screen-menu");
   $("btn-game-back").onclick = () => {
     app.playing = false;
+    closeModal();
+    hideGameOverOverlay();
     if (app.gameType === "arcade") showScreen("screen-difficulty");
     else showScreen("screen-menu");
   };
   $("btn-play").onclick = () => {
+    if (isModalOpen() || isGameOverOverlayOpen()) return;
     if (app.gameEnded) {
       gameOver();
       return;
@@ -799,7 +831,7 @@
     openModal(`
       <h3>${h.title}</h3>
       <ul class="help-list">${h.body.map((p) => `<li>${p}</li>`).join("")}</ul>
-      <div class="modal-actions"><button class="btn primary" id="help-ok">Понятно</button></div>
+      <div class="modal-actions"><button class="btn primary" type="button" id="help-ok">Понятно</button></div>
     `);
   };
   $("go-menu").onclick = () => { hideGameOverOverlay(); showScreen("screen-menu"); };
@@ -817,20 +849,26 @@
     } else {
       toast("Не удалось записать результат");
     }
-    showLeaderboard();
+    showLeaderboard(true);
   };
   $("krol-ok").onclick = () => dismissKrolOverlay(true);
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
+    if (e.target.id === "lb-close" || e.target.id === "help-ok") closeModal();
   });
-  document.addEventListener("click", (e) => { if (e.target.id === "help-ok") closeModal(); });
   window.addEventListener("keydown", (e) => {
+    if (e.code === "Escape" && isModalOpen()) {
+      e.preventDefault();
+      closeModal();
+      return;
+    }
     if (isKrolOverlayOpen() && (e.code === "Enter" || e.code === "Space" || e.code === "Escape")) {
       e.preventDefault();
       dismissKrolOverlay(true);
       return;
     }
     if (e.code === "Space" && app.screen === "screen-game") {
+      if (isModalOpen() || isGameOverOverlayOpen() || isKrolOverlayOpen()) return;
       e.preventDefault();
       $("btn-play").click();
     }

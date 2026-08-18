@@ -55,7 +55,7 @@ describe("аркада: таймер без зверей", () => {
     });
     assert.ok(!r.died || r.died >= ctx.ARCADE_STALE_AFTER,
       `слишком рано: ${JSON.stringify(r)}`);
-    assert.ok(r.energy < HERB_COST, "зайца нельзя купить только с пассивного дохода");
+    assert.ok(r.energy < PRED_COST, "пассивного дохода не хватает на лису");
   });
 
   test("устаревший хардкор 50⚡ заканчивался бы на лимите", () => {
@@ -107,13 +107,24 @@ describe("аркада: симуляция бота", () => {
 });
 
 describe("аркада: устойчивость после цепочки", () => {
-  test("пустая чашка не завершает игру при sustainedChain", () => {
-    const { world, T } = createWorld();
+  test("пустая чашка не завершает игру сразу при sustainedChain", () => {
+    const { world } = createWorld();
     world.arcade = true;
     world.sustainedChain = true;
     world.generation = 10;
     assert.equal(world.isAlive(), false);
     world.step();
     assert.equal(world.gameOver, false, "после цепочки можно восстановить лес");
+  });
+
+  test("полное вымирание завершает игру даже после цепочки", () => {
+    const { world, ARCADE_LONELY_MAX } = createWorld();
+    world.arcade = true;
+    world.sustainedChain = true;
+    world.lonelyGens = ARCADE_LONELY_MAX;
+    world.noAnimalGens = ARCADE_LONELY_MAX;
+    world.generation = ARCADE_LONELY_MAX + 1;
+    world.checkArcadeEnd(6, 45);
+    assert.equal(world.gameOver, true);
   });
 });
