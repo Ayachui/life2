@@ -40,6 +40,9 @@
       maxEnergyPerGen: 6,
       discoveryOnlyMutation: true,
       surplusDecay: 0.04,
+      /** Импульс вмешательства: после налога леса, не выше cap. Не ферма. */
+      pulsePerGen: 0.5,
+      pulseCap: 90,
       upkeep: {
         freeBiomass: 48,
         perExtra: 0.04,

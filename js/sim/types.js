@@ -32,7 +32,8 @@ var ARCADE_STALE_AFTER = BAL.arcadeEnd?.staleAfter ?? 40;
 var ARCADE_LONELY_MAX = BAL.arcadeEnd?.lonelyMax ?? 120;
 var ARCADE_NO_HERB_MAX = BAL.arcadeEnd?.noHerbMax ?? 60;
 var ARCADE_PRED_ONLY_MAX = BAL.arcadeEnd?.predOnlyMax ?? 35;
-var ROULETTE_INTERVAL = BAL.roulette?.interval ?? 500;
+var ARCADE_ERA_AFTER_CHAIN = BAL.arcadeEnd?.eraAfterChain ?? 200;
+var ROULETTE_INTERVAL = BAL.roulette?.interval ?? 100;
 var PLAGUE_FOG_TICKS = BAL.roulette?.plagueFogTicks ?? 45;
 var SURVIVAL_POINT_INTERVAL = BAL.arcadeEnd?.survivalPointInterval ?? 100;
 var CHAIN_SUSTAIN_GENS = BAL.arcadeEnd?.chainSustainGens ?? 25;
@@ -53,6 +54,7 @@ function emptyEnergyAudit() {
     upkeep: 0,
     capped: 0,
     surplusDecay: 0,
+    pulse: 0,
     other: 0
   };
 }

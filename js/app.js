@@ -145,6 +145,12 @@
     $("modal-card").classList.toggle("wide", !!wide);
     $("modal").classList.remove("hidden");
   }
+  function arcadeOverTitle(reason) {
+    if (reason === "era_complete") return "Эксперимент завершён";
+    if (reason === "no_chain") return "Лесу не хватило живых зверей";
+    return "Экосистема остановилась";
+  }
+
   function closeModal() {
     $("modal").classList.add("hidden");
     $("modal-card").classList.remove("wide");
@@ -152,10 +158,7 @@
     $("modal-card").classList.remove("rules-info-card");
     if (app.resumeGameOverAfterModal && app.gameEnded && app.gameType === "arcade" && app.world) {
       app.resumeGameOverAfterModal = false;
-      const title = app.world.gameOverReason === "no_chain"
-        ? "Лесу не хватило живых зверей"
-        : "Экосистема остановилась";
-      showGameOverOverlay(title, app.world.lifePoints, app.world.generation, app.difficulty);
+      showGameOverOverlay(arcadeOverTitle(app.world.gameOverReason), app.world.lifePoints, app.world.generation, app.difficulty);
     }
   }
 
@@ -234,6 +237,11 @@
     $("roulette-result").classList.add("hidden");
     $("roulette-spin").disabled = false;
     resetRouletteWheel();
+    const lead = document.querySelector(".roulette-lead");
+    if (lead) {
+      const n = LIFE_DATA.roulette?.interval ?? 100;
+      lead.textContent = `Прошло ${n} циклов — крути рулетку и узнай, что случится с миром.`;
+    }
     $("roulette-overlay").classList.remove("hidden");
   }
 
@@ -542,6 +550,7 @@
     canvas.style.cursor = app.tool === "inspect" ? "help" : "crosshair";
     const herbCost = herbCostSafe();
     const predCost = LIFE_DATA.tools.find((t) => t.id === "pred")?.cost ?? 90;
+    const plantCost = LIFE_DATA.tools.find((t) => t.id === "plant")?.cost ?? 8;
     const model = LifeHud.hudModel(w, {
       gameType: app.gameType,
       started: app.started,
@@ -549,6 +558,7 @@
       budget: app.difficulty?.energy ?? w.arcadeBudget,
       herbCost,
       predCost,
+      plantCost,
       analytics: a
     });
 
@@ -613,17 +623,31 @@
     if (chainEl) {
       if (app.gameType === "arcade") {
         chainEl.classList.remove("hidden");
-        chainEl.classList.toggle("is-locked", model.chain.locked);
+        chainEl.classList.toggle("is-locked", model.chain.locked && !model.era);
+        chainEl.classList.toggle("is-era", !!model.era);
+        chainEl.classList.toggle("is-era-late", !!(model.era && model.era.late));
         if (model.chain.locked && !app.hudPrev.chainLocked) {
           flashStat(chainEl, "is-up");
           spawnHudPop("Цепочка жива!", "score");
-          toast("Цепочка жива — очки за время", { important: true });
+          toast("Цепочка жива — копи ⚡ на правки, эра ограничена", { important: true });
         }
         app.hudPrev.chainLocked = model.chain.locked;
         const bar = $("hud-chain-bar");
-        if (bar) bar.style.width = `${Math.round((model.chain.locked ? 1 : model.chain.ratio) * 100)}%`;
+        if (bar) {
+          const ratio = model.era ? model.era.ratio : (model.chain.locked ? 1 : model.chain.ratio);
+          bar.style.width = `${Math.round(ratio * 100)}%`;
+        }
         const val = $("hud-chain-val");
-        if (val) val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
+        if (val) {
+          val.textContent = model.era
+            ? `ещё ${model.era.left}`
+            : (model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`);
+        }
+        const lab = $("hud-chain-label");
+        if (lab) lab.textContent = model.era ? "Эра" : "Цепочка";
+        chainEl.title = model.era
+          ? `До записи результата ${model.era.left} циклов`
+          : "Живая цепочка";
       } else {
         chainEl.classList.add("hidden");
       }
@@ -652,7 +676,7 @@
     renderTrophic($("hud-trophic"), model.trophic, a);
 
     const extraKey = model.trophic.extra.map((s) => `${s.id}${s.value}`).join(",");
-    const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.threat?.text || ""}`;
+    const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.era?.left ?? ""}|${model.threat?.text || ""}`;
     if (statsKey !== app.statsCacheKey) {
       app.statsCacheKey = statsKey;
       const grid = $("stats-grid");
@@ -1222,9 +1246,7 @@
     const cycles = app.world.generation;
     const points = app.world.lifePoints;
     const diff = app.difficulty;
-    const title = app.world.gameOverReason === "no_chain"
-      ? "Лесу не хватило живых зверей"
-      : "Экосистема остановилась";
+    const title = arcadeOverTitle(app.world.gameOverReason);
 
     if (!app.gameEnded) {
       app.gameEnded = true;

@@ -11,11 +11,12 @@
       predOnlyMax: 35,
       chainSustainGens: 25,
       noAnimalRenewalGens: 90,
-      survivalPointInterval: 100
+      survivalPointInterval: 100,
+      eraAfterChain: 200
     },
 
     roulette: {
-      interval: 500,
+      interval: 100,
       weights: { earthquake: 30, flood: 30, plague: 25, evolution: 15 },
       pct: {
         earthquake: [0.1, 0.3],

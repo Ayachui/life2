@@ -2,7 +2,7 @@ const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   hudNum, hudEnergyBand, hudThreat, hudChain, hudObjective, hudModel, hudRouletteEta,
-  hudSpecials, hudTrophic
+  hudSpecials, hudTrophic, hudEra
 } = require("../js/hud.js");
 
 describe("HUD: взгляд за секунду", () => {
@@ -11,11 +11,12 @@ describe("HUD: взгляд за секунду", () => {
     assert.equal(hudNum(Infinity), "∞");
   });
 
-  test("⚡ broke если нельзя купить зайца", () => {
-    assert.equal(hudEnergyBand(40, 45, 90), "broke");
-    assert.equal(hudEnergyBand(50, 45, 90), "tight");
-    assert.equal(hudEnergyBand(500, 45, 90), "ok");
-    assert.equal(hudEnergyBand(Infinity, 45, 90), "sandbox");
+  test("⚡ broke только если нельзя посадить траву", () => {
+    assert.equal(hudEnergyBand(5, 45, 90, 8), "broke");
+    assert.equal(hudEnergyBand(40, 45, 90, 8), "tight");
+    assert.equal(hudEnergyBand(50, 45, 90, 8), "ok");
+    assert.equal(hudEnergyBand(500, 45, 90, 8), "ok");
+    assert.equal(hudEnergyBand(Infinity, 45, 90, 8), "sandbox");
   });
 
   test("угроза: нет зайцев — таймер поражения", () => {
@@ -58,8 +59,8 @@ describe("HUD: взгляд за секунду", () => {
   });
 
   test("рулетка: сколько циклов до события", () => {
-    assert.equal(hudRouletteEta({ generation: 420 }), 80);
-    assert.equal(hudRouletteEta({ generation: 500 }), 0);
+    assert.equal(hudRouletteEta({ generation: 80 }), 20);
+    assert.equal(hudRouletteEta({ generation: 100 }), 0);
   });
 
   test("модель содержит trophic и viability", () => {
@@ -95,5 +96,23 @@ describe("HUD: взгляд за секунду", () => {
     assert.equal(withKoala.extra.length, 1);
     assert.equal(withKoala.extra[0].id, "koala");
     assert.equal(withKoala.extra[0].value, 1);
+  });
+
+  test("эра после цепочки — сколько циклов до записи", () => {
+    const era = hudEra({
+      sustainedChain: true,
+      chainLockGen: 40,
+      generation: 80
+    });
+    assert.equal(era.left, 160);
+    assert.equal(era.used, 40);
+    const o = hudObjective({
+      sustainedChain: true,
+      chainLockGen: 40,
+      generation: 80,
+      arcade: true,
+      herbivoreCount: () => 3
+    }, { gameType: "arcade", started: true });
+    assert.match(o.line, /160/);
   });
 });

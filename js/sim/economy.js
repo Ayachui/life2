@@ -46,6 +46,37 @@ World.prototype.arcadeSurplusDecay = function arcadeSurplusDecay() {
     return Math.max(0, Math.ceil((projected - budget) * rate));
   };
 
+World.prototype.arcadePulseCap = function arcadePulseCap() {
+    const eco = this.arcadeEconomyCfg();
+    if (eco.pulseCap != null) return eco.pulseCap;
+    return this.arcadeBudget ?? 90;
+  };
+
+World.prototype.clampArcadePending = function clampArcadePending() {
+    const energy = Number.isFinite(this.playerEnergy) ? this.playerEnergy : 0;
+    if (energy + this.pendingEnergy < 0) this.pendingEnergy = -energy;
+  };
+
+World.prototype.applyArcadePulse = function applyArcadePulse() {
+    if (!this.sustainedChain) return 0;
+    const eco = this.arcadeEconomyCfg();
+    const per = eco.pulsePerGen;
+    if (!per) return 0;
+    this.pulseAcc = (this.pulseAcc || 0) + per;
+    const grant = Math.floor(this.pulseAcc);
+    this.pulseAcc -= grant;
+    if (grant <= 0) return 0;
+    const energy = Number.isFinite(this.playerEnergy) ? this.playerEnergy : 0;
+    const projected = energy + this.pendingEnergy;
+    const room = Math.max(0, this.arcadePulseCap() - projected);
+    const add = Math.min(grant, room);
+    if (add > 0) {
+      this.pendingEnergy += add;
+      this.noteEnergyAudit("pulse", add);
+    }
+    return add;
+  };
+
 World.prototype.settleArcadeEconomy = function settleArcadeEconomy() {
     if (!this.arcade) return;
     const cap = this.arcadeEconomyCfg().maxEnergyPerGen;
@@ -63,6 +94,8 @@ World.prototype.settleArcadeEconomy = function settleArcadeEconomy() {
       this.noteEnergyAudit("surplusDecay", decay);
       this.pendingEnergy -= decay;
     }
+    this.clampArcadePending();
+    this.applyArcadePulse();
     this.foldEnergyAudit();
     const log = this.economyLog || (this.economyLog = []);
     log.push({
@@ -72,9 +105,11 @@ World.prototype.settleArcadeEconomy = function settleArcadeEconomy() {
       granted: (this.energyAuditTick.hunt || 0)
         + (this.energyAuditTick.koalaTreeBite || 0)
         + (this.energyAuditTick.mutation || 0)
+        + (this.energyAuditTick.pulse || 0)
         + (this.energyAuditTick.other || 0),
       upkeep: this.energyAuditTick.upkeep || 0,
       decay: this.energyAuditTick.surplusDecay || 0,
+      pulse: this.energyAuditTick.pulse || 0,
       herbs: this.herbivoreCount(),
       plants: this.counts().plants
     });

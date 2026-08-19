@@ -950,12 +950,13 @@ describe("террейн и рулетка", () => {
     assert.ok(world.counts().water > 0);
   });
 
-  test("каждые 500 циклов помечается рулетка", () => {
-    const { world } = createWorld();
+  test("каждые N циклов помечается рулетка", () => {
+    const { world, LIFE_BALANCE } = createWorld();
+    const n = LIFE_BALANCE.roulette.interval;
     world.arcade = true;
-    world.generation = 499;
+    world.generation = n - 1;
     world.step();
-    assert.equal(world.generation, 500);
+    assert.equal(world.generation, n);
     assert.equal(world.roulettePending, true);
   });
 });

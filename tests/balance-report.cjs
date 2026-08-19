@@ -49,7 +49,7 @@ function runReport() {
       `${diffId} survival min ${row.survivalMin} < ${th.minSurvival * 0.5}`);
   }
 
-  console.log("Balance report (Alpha 0.12.2)");
+  console.log("Balance report (Alpha 0.13.0)");
   console.table(rows);
   console.log("tools", toolCosts(ctx));
   return rows;

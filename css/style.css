@@ -433,6 +433,14 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   background: rgba(62, 224, 162, 0.16);
   border-color: var(--mint);
 }
+.hud-chain.is-era {
+  background: rgba(255, 193, 77, 0.1);
+  border-color: rgba(255, 193, 77, 0.4);
+}
+.hud-chain.is-era-late {
+  background: rgba(255, 93, 122, 0.12);
+  border-color: var(--coral);
+}
 .hud-chain.is-up { animation: hudPulseMint 0.55s ease; }
 .hud-chain-label {
   font-size: 10px;

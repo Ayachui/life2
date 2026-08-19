@@ -190,6 +190,6 @@ describe("баланс: мутации", () => {
   test("roulette.interval единый источник", () => {
     const { LIFE_DATA, LIFE_BALANCE } = createWorld();
     assert.equal(LIFE_DATA.roulette.interval, LIFE_BALANCE.roulette.interval);
-    assert.equal(LIFE_BALANCE.roulette.interval, 500);
+    assert.equal(LIFE_BALANCE.roulette.interval, 100);
   });
 });
