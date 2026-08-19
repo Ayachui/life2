@@ -14,7 +14,7 @@
     started: false,
     speed: 0,
     speedLabels: ["×1", "×2", "×3", "×5", "×10"],
-    speedTicks: [0.33, 0.67, 1, 1.67, 3.33],
+    speedTicks: [0.66, 1.34, 2, 3.34, 6.66],
     world: null,
     painting: false,
     lastPaintCell: null,
