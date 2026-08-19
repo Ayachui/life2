@@ -84,6 +84,7 @@ const BREED_MIN_AGE = {
 /** Стартовый кулдаун для посаженных зверей (дополнительно к возрасту). */
 const BREED_COOL_INIT = { herb: 10, pred: 14 };
 const WATER_SLOW_MUL = 2;
+const WATER_GROWTH_MUL = 2;
 
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
 
@@ -364,7 +365,7 @@ class World {
     for (const c of krolFootprintAt(ax, ay)) {
       if (!this.inside(c.x, c.y)) return false;
       const t = this.get(c.x, c.y);
-      if (t === WALL && !(this.arcade && this.inDish(c.x, c.y))) return false;
+      if (t === WALL) return false;
       for (const o of this.agents) {
         if (o.dead || o === baby || o === parent) continue;
         if (agentOccupies(o, c.x, c.y) && isKrolDushegub(o)) return false;
@@ -450,11 +451,11 @@ class World {
       for (const c of krolFootprintAt(x, y)) {
         if (!this.inside(c.x, c.y)) return false;
         const t = this.get(c.x, c.y);
-        if (t === WALL && !(this.arcade && this.inDish(c.x, c.y))) return false;
+        if (t === WALL) return false;
         const other = this.agentAt(c.x, c.y);
-        if (t !== EMPTY && t !== PLANT && !agentOccupies(a, c.x, c.y)) {
+        if (t !== EMPTY && t !== PLANT && t !== WATER && !agentOccupies(a, c.x, c.y)) {
           const preyPass = other && other !== a && this.canHunt(a, other);
-          if (!preyPass && !(this.arcade && this.inDish(c.x, c.y) && (t === WATER || t === WALL))) return false;
+          if (!preyPass) return false;
         }
         if (other && other !== a && !this.canHunt(a, other)) return false;
       }
@@ -578,9 +579,7 @@ class World {
 
   isWalkable(x, y) {
     const t = this.get(x, y);
-    if (t === EMPTY) return true;
-    if (this.arcade && this.inDish(x, y) && (t === WATER || t === WALL)) return true;
-    return false;
+    return t === EMPTY || t === WATER;
   }
 
   clone() {
@@ -767,7 +766,9 @@ class World {
   }
 
   growthMulAt(x, y) {
-    return 1 + this.fertilizerBoost(x, y);
+    let mul = 1 + this.fertilizerBoost(x, y);
+    if (this.countType(x, y, WATER) > 0) mul *= WATER_GROWTH_MUL;
+    return mul;
   }
 
   distCheb(ax, ay, bx, by) {
@@ -1041,7 +1042,7 @@ class World {
   }
 
   agentOnWater(a) {
-    if (!this.arcade || !a) return false;
+    if (!a) return false;
     for (const c of agentFootprint(a)) {
       if (this.get(c.x, c.y) === WATER) return true;
     }
