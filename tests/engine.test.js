@@ -912,3 +912,59 @@ describe("террейн и рулетка", () => {
     assert.equal(world.roulettePending, true);
   });
 });
+
+describe("корова и наследование мутантов", () => {
+  test("корова насыщается от дерева за ~4 цикла", () => {
+    const { world, T, PLANT_CFG } = createWorld();
+    const cow = world.makeAgent(5, 5, T.HERB);
+    world.applySpeciesTrait(cow, "корова", 5, 5);
+    cow.energy = 12;
+    world.set(5, 5, T.HERB);
+    world.setPlant(6, 5, T.STAGE_TREE, 0);
+    world.plantBites[world.idx(6, 5)] = PLANT_CFG.treeBitesCow;
+    world.agents = [cow];
+    let peak = cow.energy;
+    for (let i = 0; i < 5; i++) {
+      world.stepAgents();
+      peak = Math.max(peak, cow.energy);
+      if (peak >= cow.thresh) break;
+    }
+    assert.ok(peak >= cow.thresh, `peak energy ${peak} < thresh ${cow.thresh}`);
+    assert.ok(world.plantBites[world.idx(6, 5)] < PLANT_CFG.treeBitesCow, "дерево должно быть частично съедено");
+  });
+
+  test("мутант передаёт вид потомству", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    world.applySpeciesTrait(parent, "корова", 5, 5);
+    const baby = world.makeAgent(6, 5, T.HERB, parent);
+    assert.ok(world.inheritSpeciesTrait(baby, parent));
+    assert.equal(baby.trait, "корова");
+    assert.equal(baby.moveInterval, 4);
+    assert.equal(baby.drain, 1.2);
+  });
+
+  test("коала и волк наследуются потомством", () => {
+    const { world, T } = createWorld();
+    const koalaParent = world.makeAgent(2, 2, T.HERB);
+    world.applySpeciesTrait(koalaParent, "коала", 2, 2);
+    const koalaBaby = world.makeAgent(3, 2, T.HERB, koalaParent);
+    assert.ok(world.inheritSpeciesTrait(koalaBaby, koalaParent));
+    assert.equal(koalaBaby.trait, "коала");
+
+    const wolfParent = world.makeAgent(5, 5, T.PRED);
+    world.applySpeciesTrait(wolfParent, "волк", 5, 5);
+    const wolfBaby = world.makeAgent(6, 5, T.PRED, wolfParent);
+    assert.ok(world.inheritSpeciesTrait(wolfBaby, wolfParent));
+    assert.equal(wolfBaby.trait, "волк");
+  });
+
+  test("крол-душегуб не наследуется при размножении", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    parent.trait = "крол-душегуб";
+    const baby = world.makeAgent(6, 5, T.HERB, parent);
+    assert.equal(world.inheritSpeciesTrait(baby, parent), false);
+    assert.equal(baby.trait, null);
+  });
+});
