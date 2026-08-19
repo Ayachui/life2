@@ -55,7 +55,7 @@ describe("аркада: таймер без зверей", () => {
     });
     assert.ok(!r.died || r.died >= ctx.ARCADE_STALE_AFTER,
       `слишком рано: ${JSON.stringify(r)}`);
-    assert.ok(r.energy < PRED_COST, "пассивного дохода не хватает на лису");
+    assert.ok(r.gainedEnergy < PRED_COST, "пассивного дохода не хватает на лису");
   });
 
   test("устаревший хардкор 50⚡ заканчивался бы на лимите", () => {

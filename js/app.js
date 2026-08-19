@@ -288,7 +288,7 @@
     const grid = $("tool-grid");
     grid.innerHTML = "";
     for (const t of LIFE_DATA.tools) {
-      if (app.gameType === "arcade" && (t.id === "water" || t.id === "wall")) continue;
+      if (app.gameType === "arcade" && t.id === "erase") continue;
       const b = document.createElement("button");
       const cost = toolCost(t.id);
       const cantAfford = app.gameType === "arcade" && cost > 0 && app.energy < cost;
@@ -331,9 +331,6 @@
       ["🦊", "лиса"], ["🐺", "волк"], ["🦌", "лось"], ["🐻", "медведь"],
       ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"]
     ];
-    if (app.gameType === "arcade") {
-      items = items.filter(([mark]) => mark !== "💧" && mark !== "🪨");
-    }
     $("legend").innerHTML = items.map(([mark, n]) => `<span>${mark} ${n}</span>`).join("");
   }
 

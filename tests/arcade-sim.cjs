@@ -95,6 +95,7 @@ function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost = HERB_CO
   world.arcade = true;
   world.makeDish();
   let energy = startEnergy;
+  let gainedEnergy = 0;
   const cy = 14;
   for (let x = 10; x < 22 && energy >= plantCost; x++) {
     if (world.inDish(x, cy) && world.get(x, cy) === T.EMPTY) {
@@ -104,12 +105,13 @@ function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost = HERB_CO
   }
   for (let g = 0; g < maxGens; g++) {
     world.step();
+    gainedEnergy += world.pendingEnergy;
     energy += world.pendingEnergy;
     world.pendingEnergy = 0;
     world.checkArcadeEnd(energy, herbCost);
-    if (world.gameOver) return { died: g + 1, reason: world.gameOverReason, energy };
+    if (world.gameOver) return { died: g + 1, reason: world.gameOverReason, energy, gainedEnergy };
   }
-  return { survived: maxGens, energy };
+  return { survived: maxGens, energy, gainedEnergy };
 }
 
 module.exports = {
