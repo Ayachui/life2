@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 10, patch: 2 },
+  gameVersion: { stage: "alpha", major: 0, minor: 10, patch: 3 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -296,4 +296,36 @@ function formatGameVersion(v = LIFE_DATA.gameVersion) {
   const num = `${v.major}.${v.minor}.${v.patch}`;
   const label = labels[v.stage];
   return label ? `${label} ${num}` : num;
+}
+
+/** Центры секторов рулетки по часовой от верхней точки (0°). */
+const ROULETTE_SLICE_CENTER = {
+  earthquake: 45,
+  flood: 135,
+  plague: 225,
+  evolution: 315
+};
+
+/** Какой сектор окажется под стрелкой после поворота колеса на rotationDeg. */
+function rouletteSliceAtPointer(rotationDeg) {
+  const norm = ((rotationDeg % 360) + 360) % 360;
+  const local = (360 - norm) % 360;
+  if (local < 90) return "earthquake";
+  if (local < 180) return "flood";
+  if (local < 270) return "plague";
+  return "evolution";
+}
+
+/** Угол CSS-transform: несколько оборотов + остановка на нужном секторе. */
+function rouletteSpinDegrees(event, rng = Math.random) {
+  const center = ROULETTE_SLICE_CENTER[event] ?? ROULETTE_SLICE_CENTER.earthquake;
+  const turns = 5 + Math.floor(rng() * 2);
+  const jitter = (rng() - 0.5) * 50;
+  return turns * 360 + (360 - center) + jitter;
+}
+
+if (typeof window !== "undefined") {
+  window.ROULETTE_SLICE_CENTER = ROULETTE_SLICE_CENTER;
+  window.rouletteSliceAtPointer = rouletteSliceAtPointer;
+  window.rouletteSpinDegrees = rouletteSpinDegrees;
 }
