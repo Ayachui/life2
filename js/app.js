@@ -455,8 +455,10 @@
       b.title = LIFE_DATA.toolHelp[t.id] || "";
       b.onclick = () => {
         if (cantAfford) { toast("Не хватает энергии"); return; }
+        if (app.tool === "inspect" && t.id !== "inspect") app.inspect = null;
         app.tool = t.id;
         renderTools();
+        renderInspect();
       };
       grid.appendChild(b);
     }
@@ -558,6 +560,7 @@
     renderTools();
     legend();
     updateEnergy();
+    renderInspect();
     $("log").innerHTML = "";
     resize();
     draw();

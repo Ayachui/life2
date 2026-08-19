@@ -1,6 +1,6 @@
-/** Единый источник чисел баланса — Альфа 0.11.2. Тексты в data.js. */
+/** Единый источник чисел баланса — Альфа 0.11.3. Тексты в data.js. */
 const LIFE_BALANCE = {
-  version: { stage: "alpha", major: 0, minor: 11, patch: 2 },
+  version: { stage: "alpha", major: 0, minor: 11, patch: 3 },
 
   tools: {
     plant: 8,
