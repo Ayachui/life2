@@ -64,6 +64,8 @@ const ARCADE_STALE_AFTER = 40;
 const ARCADE_LONELY_MAX = 120;
 const ARCADE_NO_HERB_MAX = 60;
 const ARCADE_PRED_ONLY_MAX = 35;
+const ROULETTE_INTERVAL = 500;
+const PLAGUE_FOG_TICKS = 45;
 const SURVIVAL_POINT_INTERVAL = 100;
 const CHAIN_SUSTAIN_GENS = 25;
 
@@ -163,6 +165,10 @@ class World {
     this.sustainedChain = false;
     this.pendingEnergy = 0;
     this.lifePoints = 0;
+    this.roulettePending = false;
+    this.plagueFogTicks = 0;
+    this.screenShake = 0;
+    this.lastRouletteEvent = null;
     this.sounds = [];
   }
 
@@ -294,8 +300,9 @@ class World {
 
   occupyAgentCells(a) {
     for (const c of agentFootprint(a)) {
-      if (this.get(c.x, c.y) === PLANT) this.clearPlant(c.x, c.y);
-      this.set(c.x, c.y, a.kind);
+      const t = this.get(c.x, c.y);
+      if (t === PLANT) this.clearPlant(c.x, c.y);
+      if (t === EMPTY || t === PLANT) this.set(c.x, c.y, a.kind);
     }
   }
 
@@ -1472,7 +1479,11 @@ class World {
 
   grantArcadeEnergy(key) {
     if (!this.arcade || !key) return 0;
-    const gain = this.arcadeEnergyTable()[key] ?? 0;
+    let gain = this.arcadeEnergyTable()[key] ?? 0;
+    if (gain <= 0) return 0;
+    const mul = this.ecosystemRewardMul();
+    if (mul <= 0) return 0;
+    gain = Math.floor(gain * mul);
     if (gain > 0) this.pendingEnergy += gain;
     return gain;
   }
@@ -1480,7 +1491,10 @@ class World {
   grantMutationEnergy(trait) {
     if (!this.arcade || !trait) return 0;
     const table = (typeof LIFE_DATA !== "undefined" && LIFE_DATA.mutationEnergy) || {};
-    const gain = table[trait] ?? 5;
+    const raw = table[trait] ?? 5;
+    const mul = this.ecosystemRewardMul();
+    if (mul <= 0) return 0;
+    const gain = Math.max(1, Math.floor(raw * mul * 0.5));
     this.pendingEnergy += gain;
     return gain;
   }
@@ -1642,7 +1656,106 @@ class World {
     this.stepAgents();
     this.generation++;
     this.tickSurvivalPoints();
+    if (this.plagueFogTicks > 0) this.plagueFogTicks--;
+    if (this.screenShake > 0) this.screenShake--;
+    if (this.arcade && this.generation > 0 && this.generation % ROULETTE_INTERVAL === 0) {
+      this.roulettePending = true;
+    }
     if (this.arcade && !this.isAlive() && !this.sustainedChain) this.gameOver = true;
+  }
+
+  pickRouletteEvent() {
+    const weights = (typeof LIFE_DATA !== "undefined" && LIFE_DATA.roulette?.weights)
+      || { earthquake: 30, flood: 30, plague: 25, evolution: 15 };
+    const entries = Object.entries(weights);
+    const total = entries.reduce((s, [, w]) => s + w, 0);
+    let roll = Math.random() * total;
+    for (const [key, weight] of entries) {
+      roll -= weight;
+      if (roll <= 0) return key;
+    }
+    return entries[0][0];
+  }
+
+  shuffleInPlace(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  randomPct(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  applyRouletteEvent(type) {
+    const pct = {};
+    let detail = "";
+    if (type === "earthquake") {
+      const plants = [];
+      for (let y = 0; y < this.h; y++) {
+        for (let x = 0; x < this.w; x++) {
+          if (this.get(x, y) === PLANT) plants.push({ x, y });
+        }
+      }
+      pct.value = this.randomPct(0.1, 0.3);
+      const remove = Math.max(1, Math.floor(plants.length * pct.value));
+      this.shuffleInPlace(plants);
+      for (let i = 0; i < remove && i < plants.length; i++) {
+        this.clearPlant(plants[i].x, plants[i].y);
+        this.spark(plants[i].x, plants[i].y, "#8b7355");
+      }
+      this.screenShake = 28;
+      detail = `Уничтожено ~${Math.round(pct.value * 100)}% растений`;
+      this.chime("roulette_earthquake");
+    } else if (type === "flood") {
+      const empty = [];
+      for (let y = 0; y < this.h; y++) {
+        for (let x = 0; x < this.w; x++) {
+          if (this.get(x, y) === EMPTY && (!this.dish || this.inDish(x, y))) empty.push({ x, y });
+        }
+      }
+      pct.value = this.randomPct(0.1, 0.5);
+      const add = Math.max(1, Math.floor(empty.length * pct.value));
+      this.shuffleInPlace(empty);
+      for (let i = 0; i < add && i < empty.length; i++) {
+        this.set(empty[i].x, empty[i].y, WATER);
+      }
+      detail = `Затоплено ~${Math.round(pct.value * 100)}% свободных клеток`;
+      this.chime("roulette_flood");
+    } else if (type === "plague") {
+      const live = this.agents.filter((a) => !a.dead && !isKrolDushegub(a));
+      pct.value = this.randomPct(0.1, 0.3);
+      const killN = Math.max(live.length > 0 ? 1 : 0, Math.floor(live.length * pct.value));
+      this.shuffleInPlace(live);
+      for (let i = 0; i < killN; i++) this.dieAgent(live[i]);
+      this.plagueFogTicks = PLAGUE_FOG_TICKS;
+      detail = `Погибло ~${Math.round(pct.value * 100)}% зверей`;
+      this.chime("roulette_plague");
+    } else if (type === "evolution") {
+      const targets = this.agents.filter((a) => !a.dead && !a.trait
+        && ((a.kind === HERB) || (a.kind === PRED)));
+      pct.value = this.randomPct(0.5, 1);
+      const evolveN = Math.max(targets.length > 0 ? 1 : 0, Math.floor(targets.length * pct.value));
+      this.shuffleInPlace(targets);
+      let evolved = 0;
+      for (let i = 0; i < evolveN; i++) {
+        const a = targets[i];
+        if (a.kind === HERB) {
+          const trait = Math.random() < 0.5 ? TRAIT.KOALA : TRAIT.COW;
+          if (this.applySpeciesTrait(a, trait, a.x, a.y)) evolved++;
+        } else if (a.kind === PRED) {
+          const trait = Math.random() < 0.5 ? TRAIT.WOLF : TRAIT.ELK;
+          if (this.applySpeciesTrait(a, trait, a.x, a.y)) evolved++;
+        }
+      }
+      detail = `Эволюционный скачок: ${evolved} зверей`;
+      this.chime("roulette_evolution");
+    }
+    this.lastRouletteEvent = { type, generation: this.generation, detail, pct: pct.value };
+    this.roulettePending = false;
+    return this.lastRouletteEvent;
   }
 
   tickDecays() {
@@ -1927,6 +2040,14 @@ class World {
           const edible = c.grass + c.bush * PLANT_CFG.bushFoodWeight;
           if (c.herbs > edible * 0.85) breedChance = 0.25;
           else if (c.herbs > edible * 0.55) breedChance = 0.55;
+        } else if (a.kind === PRED && c.preds > 0) {
+          if (c.herbs <= 0) breedChance = 0;
+          else {
+            const ratio = c.preds / Math.max(1, c.herbs);
+            if (ratio >= 1) breedChance = 0.12;
+            else if (ratio >= 0.5) breedChance = 0.3;
+            else if (ratio >= 0.25) breedChance = 0.5;
+          }
         }
         if (Math.random() < breedChance) {
           const litter = this.litterSize(a);
@@ -1936,7 +2057,7 @@ class World {
             if (!spot) break;
             if (!bred) {
               a.energy *= 0.5;
-              a.cool = a.kind === PRED ? 24 : 36;
+              a.cool = a.kind === PRED ? 48 : 36;
               bred = true;
             }
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
@@ -1995,4 +2116,5 @@ window.ARCADE_LONELY_MAX = ARCADE_LONELY_MAX;
 window.ARCADE_NO_HERB_MAX = ARCADE_NO_HERB_MAX;
 window.ARCADE_PRED_ONLY_MAX = ARCADE_PRED_ONLY_MAX;
 window.SURVIVAL_POINT_INTERVAL = SURVIVAL_POINT_INTERVAL;
+window.PLAGUE_FOG_TICKS = PLAGUE_FOG_TICKS;
 window.CHAIN_SUSTAIN_GENS = CHAIN_SUSTAIN_GENS;

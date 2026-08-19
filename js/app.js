@@ -23,7 +23,8 @@
     krolResumePlaying: false,
     resumeGameOverAfterModal: false,
     lbTab: "easy",
-    scoreSubmitted: false
+    scoreSubmitted: false,
+    rouletteResume: false
   };
 
   const canvas = $("world");
@@ -185,6 +186,86 @@
 
   function isKrolOverlayOpen() {
     return !$("krol-overlay").classList.contains("hidden");
+  }
+
+  function isRouletteOpen() {
+    return !$("roulette-overlay").classList.contains("hidden");
+  }
+
+  function updatePlagueFog() {
+    const fog = $("plague-fog");
+    const w = app.world;
+    if (!fog || !w) return;
+    if (w.plagueFogTicks > 0) {
+      fog.classList.remove("hidden");
+      fog.style.opacity = String(Math.min(0.7, (w.plagueFogTicks / (window.PLAGUE_FOG_TICKS || 45)) * 0.7));
+    } else {
+      fog.classList.add("hidden");
+    }
+  }
+
+  function shakeOffset() {
+    const w = app.world;
+    if (!w?.screenShake) return { x: 0, y: 0 };
+    const mag = w.screenShake * 0.4;
+    return { x: (Math.random() - 0.5) * mag * 2, y: (Math.random() - 0.5) * mag * 2 };
+  }
+
+  const ROULETTE_SPIN_DEG = {
+    earthquake: 2025,
+    flood: 2250,
+    plague: 2475,
+    evolution: 2700
+  };
+
+  function openRouletteOverlay() {
+    if (isRouletteOpen() || !app.world?.roulettePending) return;
+    app.rouletteResume = app.playing;
+    app.playing = false;
+    $("btn-play").textContent = "▶ Старт";
+    $("roulette-result").classList.add("hidden");
+    $("roulette-spin").disabled = false;
+    const wheel = $("roulette-wheel");
+    wheel.classList.remove("spinning");
+    wheel.style.transform = "";
+    $("roulette-overlay").classList.remove("hidden");
+  }
+
+  function closeRouletteOverlay() {
+    $("roulette-overlay").classList.add("hidden");
+    if (app.rouletteResume) {
+      app.playing = true;
+      $("btn-play").textContent = "⏸ Пауза";
+    }
+    app.rouletteResume = false;
+  }
+
+  function spinRoulette() {
+    if (!app.world?.roulettePending) return;
+    const event = app.world.pickRouletteEvent();
+    const labels = LIFE_DATA.roulette?.labels?.[event] || { icon: "?", title: event, desc: "" };
+    const wheel = $("roulette-wheel");
+    const spinBtn = $("roulette-spin");
+    spinBtn.disabled = true;
+    wheel.classList.remove("spinning");
+    void wheel.offsetWidth;
+    const base = ROULETTE_SPIN_DEG[event] || 2160;
+    const extra = Math.floor(Math.random() * 360);
+    wheel.style.setProperty("--spin-deg", `${base + extra}deg`);
+    wheel.classList.add("spinning");
+    LifeSound.play("ui");
+    setTimeout(() => {
+      const result = app.world.applyRouletteEvent(event);
+      flushWorldSounds(app.world);
+      const resultEl = $("roulette-result");
+      resultEl.textContent = `${labels.icon} ${labels.title}: ${result.detail}`;
+      resultEl.classList.remove("hidden");
+      log(`Рулетка: ${labels.title} — ${result.detail}`);
+      toast(`${labels.icon} ${labels.title}`);
+      updatePlagueFog();
+      draw();
+      setTimeout(closeRouletteOverlay, 2000);
+    }, 2400);
   }
 
   function agentIcon(a) {
@@ -634,7 +715,10 @@
     if (!w) return;
     const s = app.cell;
     const T = LIFE_TYPES;
+    const shake = shakeOffset();
     ctx.clearRect(0, 0, COLS * s, ROWS * s);
+    ctx.save();
+    ctx.translate(shake.x, shake.y);
     ctx.fillStyle = "#08151d";
     ctx.fillRect(0, 0, COLS * s, ROWS * s);
 
@@ -732,9 +816,9 @@
       }
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
+    updatePlagueFog();
   }
-
-  function drawSpanEmoji(emoji, x, y, span, s, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
     const cx = (x + span / 2) * s;
@@ -1008,6 +1092,10 @@
           gameOver();
           break;
         }
+        if (app.world.roulettePending && app.gameType === "arcade") {
+          openRouletteOverlay();
+          break;
+        }
       }
       app.world.tickFx();
       updateStats();
@@ -1140,6 +1228,7 @@
     showLeaderboard(true);
   };
   $("krol-ok").onclick = () => dismissKrolOverlay(true);
+  $("roulette-spin").onclick = () => spinRoulette();
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
     if (e.target.id === "lb-close") closeModal();

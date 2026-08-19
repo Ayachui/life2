@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 9, patch: 2 },
+  gameVersion: { stage: "alpha", major: 0, minor: 10, patch: 0 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -40,13 +40,28 @@ const LIFE_DATA = {
   arcadeEnergy: {
     plantSprout: 0,
     plantEvolveGrass: 0,
-    plantEvolveBush: 1,
+    plantEvolveBush: 0,
     plantWilt: 0,
-    animalBirth: 1,
-    animalDeath: 1,
+    animalBirth: 0,
+    animalDeath: 0,
     hunt: 1,
     krolDevour: 0,
-    fertilize: 1
+    fertilize: 0
+  },
+  roulette: {
+    interval: 500,
+    weights: {
+      earthquake: 30,
+      flood: 30,
+      plague: 25,
+      evolution: 15
+    },
+    labels: {
+      earthquake: { icon: "🌋", title: "Землетрясение", desc: "Экран трясётся. Пропадает 10–30% всех растений." },
+      flood: { icon: "🌊", title: "Наводнение", desc: "Вода заполняет 10–50% свободных клеток в чашке." },
+      plague: { icon: "☠️", title: "Мор", desc: "Зелёный туман. Погибает 10–30% зверей." },
+      evolution: { icon: "🧬", title: "Эволюционный скачок", desc: "Редко: 50–100% зайцев и лис мутируют на уровень выше." }
+    }
   },
   plantEvolutionEnergy: 1,
   // Уровни эволюции: чем выше тир, тем больше очков за события цепочки.
@@ -156,11 +171,21 @@ const LIFE_DATA = {
         ]
       },
       {
+        icon: "🎰",
+        title: "Рулетка (каждые 500 циклов)",
+        items: [
+          "🌋 Землетрясение — тряска, −10–30% растений.",
+          "🌊 Наводнение — вода на 10–50% пустых клеток.",
+          "☠️ Мор — зелёный туман, −10–30% зверей.",
+          "🧬 Редкий скачок — массовая мутация зайцев и лис."
+        ]
+      },
+      {
         icon: "⚡",
         title: "Энергия",
         items: [
           "Тратишь ⚡ на траву, воду, камни и зверей до и во время игры.",
-          "Возврат: рождения, охота, смерти, мутации, эволюция растений.",
+          "Возврат в основном за охоту и мутации — пассивный доход слабый.",
           "Без травоядных растения не дают ⚡.",
           "Мало травоядных при многих хищниках — награды режутся."
         ]

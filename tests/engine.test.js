@@ -189,18 +189,18 @@ describe("энергия за эволюцию", () => {
     world.agents = [world.makeAgent(x, y, T.HERB)];
   }
 
-  test("куст → дерево даёт ⚡ в аркаде", () => {
-    const { world, T, PLANT_CFG, LIFE_DATA } = createWorld();
+  test("куст → дерево не даёт пассивный ⚡", () => {
+    const { world, T, PLANT_CFG } = createWorld();
     world.arcade = true;
     withHerb(world, T);
     world.setPlant(5, 5, T.STAGE_BUSH, PLANT_CFG.bushToTree - 1);
     world.step();
     assert.equal(world.plantStageAt(5, 5), T.STAGE_TREE);
-    assert.equal(world.pendingEnergy, LIFE_DATA.arcadeEnergy.plantEvolveBush);
+    assert.equal(world.pendingEnergy, 0);
   });
 
-  test("полный цикл трава → куст → дерево даёт ⚡", () => {
-    const { world, T, PLANT_CFG, LIFE_DATA } = createWorld();
+  test("полный цикл трава → куст → дерево без пассивного ⚡", () => {
+    const { world, T, PLANT_CFG } = createWorld();
     world.arcade = true;
     withHerb(world, T, 3, 4);
     world.setPlant(3, 3, T.STAGE_GRASS, PLANT_CFG.grassToBush - 1);
@@ -208,8 +208,7 @@ describe("энергия за эволюцию", () => {
     assert.equal(world.plantStageAt(3, 3), T.STAGE_BUSH);
     for (let i = 0; i < PLANT_CFG.bushToTree; i++) world.growPlants();
     assert.equal(world.plantStageAt(3, 3), T.STAGE_TREE);
-    const expected = LIFE_DATA.arcadeEnergy.plantEvolveBush;
-    assert.ok(world.pendingEnergy >= expected, `минимум ${expected} ⚡, получили ${world.pendingEnergy}`);
+    assert.equal(world.pendingEnergy, 0);
   });
 
   test("в песочнице эволюция не даёт ⚡", () => {
@@ -231,13 +230,21 @@ describe("энергия за эволюцию", () => {
 });
 
 describe("энергия за мутации видов", () => {
-  test("начисление по таблице", () => {
-    const { world, LIFE_DATA } = createWorld();
+  test("начисление с учётом экосистемы", () => {
+    const { world, T, LIFE_DATA } = createWorld();
     world.arcade = true;
-    assert.equal(world.grantMutationEnergy("коала"), LIFE_DATA.mutationEnergy["коала"]);
-    assert.equal(world.pendingEnergy, 14);
-    world.pendingEnergy = 0;
-    assert.equal(world.grantMutationEnergy("крол-душегуб"), 28);
+    world.set(1, 1, T.HERB);
+    world.agents = [world.makeAgent(1, 1, T.HERB)];
+    const raw = LIFE_DATA.mutationEnergy["коала"];
+    const gain = world.grantMutationEnergy("коала");
+    assert.equal(gain, Math.max(1, Math.floor(raw * 0.5)));
+    assert.equal(world.pendingEnergy, gain);
+  });
+
+  test("без травоядных мутации не дают ⚡", () => {
+    const { world } = createWorld();
+    world.arcade = true;
+    assert.equal(world.grantMutationEnergy("коала"), 0);
   });
 
   test("без аркады мутации не дают ⚡", () => {
@@ -809,8 +816,8 @@ describe("аркада: энергия за действия", () => {
     assert.equal(PLANT_CFG.treeLife, 113);
   });
 
-  test("эволюция растений даёт ⚡", () => {
-    const { world, T, LIFE_DATA, PLANT_CFG } = createWorld();
+  test("эволюция растений не даёт пассивный ⚡", () => {
+    const { world, T, PLANT_CFG } = createWorld();
     world.arcade = true;
     world.set(2, 3, T.HERB);
     world.agents = [world.makeAgent(2, 3, T.HERB)];
@@ -820,14 +827,11 @@ describe("аркада: энергия за действия", () => {
     assert.equal(world.pendingEnergy, 0);
     world.plantAge[world.idx(2, 2)] = PLANT_CFG.bushToTree;
     world.growPlants();
-    assert.equal(
-      world.pendingEnergy,
-      LIFE_DATA.arcadeEnergy.plantEvolveBush
-    );
+    assert.equal(world.pendingEnergy, 0);
   });
 
-  test("рождение и смерть дают ⚡", () => {
-    const { world, T, LIFE_DATA } = createWorld();
+  test("рождение и смерть не дают пассивный ⚡", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
     const herb = world.makeAgent(3, 3, T.HERB);
     world.agents = [herb];
@@ -838,25 +842,73 @@ describe("аркада: энергия за действия", () => {
     for (let i = 0; i < 40; i++) {
       world.stepAgents();
       world.generation++;
-      if (world.pendingEnergy > 0) break;
     }
-    assert.ok(world.pendingEnergy >= LIFE_DATA.arcadeEnergy.animalBirth, "рождение должно давать ⚡");
-
-    const before = world.pendingEnergy;
+    assert.equal(world.pendingEnergy, 0);
     herb.energy = -1;
     world.stepAgents();
-    assert.ok(world.pendingEnergy >= before + LIFE_DATA.arcadeEnergy.animalDeath);
+    assert.equal(world.pendingEnergy, 0);
   });
 
   test("охота даёт ⚡", () => {
     const { world, T, LIFE_DATA } = createWorld();
     world.arcade = true;
+    world.set(2, 3, T.HERB);
+    world.agents = [world.makeAgent(2, 3, T.HERB)];
     const prey = world.makeAgent(3, 3, T.HERB);
     const fox = world.makeAgent(4, 3, T.PRED);
-    world.agents = [prey, fox];
+    world.agents.push(prey, fox);
     world.set(3, 3, T.HERB);
     world.set(4, 3, T.PRED);
     world.killAgent(prey, fox, 7.2);
     assert.equal(world.pendingEnergy, LIFE_DATA.arcadeEnergy.hunt);
+  });
+});
+
+describe("террейн и рулетка", () => {
+  test("звери не уничтожают воду и камень", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.makeDish();
+    const cx = Math.floor(world.w / 2);
+    const cy = Math.floor(world.h / 2);
+    world.set(cx, cy, T.WATER);
+    world.set(cx + 1, cy, T.WALL);
+    const elk = world.makeAgent(cx - 1, cy, T.HERB);
+    elk.trait = "лось";
+    world.agents = [elk];
+    world.set(cx - 1, cy, T.HERB);
+    assert.ok(world.canAgentMoveTo(elk, cx, cy));
+    world.moveAgentTo(elk, cx, cy);
+    assert.equal(world.get(cx, cy), T.WATER);
+    assert.ok(world.canAgentMoveTo(elk, cx + 1, cy));
+    world.moveAgentTo(elk, cx + 1, cy);
+    assert.equal(world.get(cx + 1, cy), T.WALL);
+  });
+
+  test("рулетка: землетрясение убирает часть растений", () => {
+    const { world, T } = createWorld(12, 12);
+    world.arcade = true;
+    for (let i = 0; i < 20; i++) world.setPlant(i % 10, Math.floor(i / 10), T.STAGE_GRASS, 0);
+    const before = world.counts().plants;
+    world.applyRouletteEvent("earthquake");
+    assert.ok(world.counts().plants < before);
+    assert.ok(world.screenShake > 0);
+  });
+
+  test("рулетка: наводнение добавляет воду", () => {
+    const { world, T } = createWorld(12, 12);
+    world.arcade = true;
+    world.makeDish();
+    world.applyRouletteEvent("flood");
+    assert.ok(world.counts().water > 0);
+  });
+
+  test("каждые 500 циклов помечается рулетка", () => {
+    const { world } = createWorld();
+    world.arcade = true;
+    world.generation = 499;
+    world.step();
+    assert.equal(world.generation, 500);
+    assert.equal(world.roulettePending, true);
   });
 });

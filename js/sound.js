@@ -226,13 +226,40 @@ const LifeSound = (() => {
     },
     tutorial() {
       tone(523, 0.08, "sine", 0.025);
+    },
+    roulette_earthquake() {
+      for (let i = 0; i < 7; i++) {
+        setTimeout(() => {
+          noiseBurst(0.14, 0.055 + i * 0.008, 70 + i * 25);
+          tone(48 + i * 6, 0.1, "sawtooth", 0.045);
+        }, i * 65);
+      }
+    },
+    roulette_flood() {
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          noiseBurst(0.22, 0.028, 320 + i * 60);
+          tone(160 + i * 35, 0.18, "sine", 0.022);
+          slide(220 + i * 20, 180 + i * 15, 0.12, "triangle", 0.018);
+        }, i * 90);
+      }
+    },
+    roulette_plague() {
+      slide(240, 70, 0.55, "triangle", 0.038);
+      setTimeout(() => tone(82, 0.7, "sine", 0.032), 180);
+      setTimeout(() => noiseBurst(0.35, 0.025, 140), 320);
+    },
+    roulette_evolution() {
+      chord([392, 494, 587, 740], 0.45, 0.032);
+      setTimeout(() => chord([523, 659, 784, 988], 0.35, 0.028), 220);
     }
   };
 
   function play(name, opts = {}) {
     if (!enabled) return;
     if (name !== "ui" && name !== "mutate" && name !== "game_over" && name !== "score"
-      && name !== "energy_bonus" && name !== "krol_dushegub" && name !== "krol_fade" && !canPlay(name)) return;
+      && name !== "energy_bonus" && name !== "krol_dushegub" && name !== "krol_fade"
+      && !name.startsWith("roulette_") && !canPlay(name)) return;
     const fn = SFX[name];
     if (fn) fn(opts);
   }

@@ -30,25 +30,24 @@ describe("баланс: цены инструментов", () => {
 });
 
 describe("баланс: пассивный доход ⚡", () => {
-  test("таблица arcadeEnergy покрывает ключевые события", () => {
+  test("таблица arcadeEnergy: только охота", () => {
     const { LIFE_DATA } = createWorld();
-    const keys = [
-      "plantEvolveBush", "animalBirth", "animalDeath", "hunt", "fertilize"
-    ];
-    for (const key of keys) {
-      assert.ok(LIFE_DATA.arcadeEnergy[key] > 0, `${key} должен давать ⚡`);
-    }
-    assert.equal(LIFE_DATA.arcadeEnergy.plantSprout, 0, "прорастание не раздувает пассив");
-    assert.equal(LIFE_DATA.arcadeEnergy.plantEvolveGrass, 0, "трава→куст не раздувает пассив");
+    assert.equal(LIFE_DATA.arcadeEnergy.hunt, 1);
+    assert.equal(LIFE_DATA.arcadeEnergy.animalBirth, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.animalDeath, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.plantEvolveBush, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.plantSprout, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.plantEvolveGrass, 0);
   });
 
-  test("дерево окупает меньше половины травы", () => {
+  test("дерево не окупает посадку пассивным ⚡", () => {
     const { LIFE_DATA, PLANT_CFG } = createWorld();
     const plant = toolCost(LIFE_DATA, "plant");
     const evo = LIFE_DATA.arcadeEnergy.plantEvolveBush;
     const ticks = PLANT_CFG.grassToBush + PLANT_CFG.bushToTree;
-    assert.ok(evo < plant * 0.5, "1 дерево не должно полностью окупать посадку");
+    assert.equal(evo, 0);
     assert.ok(ticks >= 30, "эволюция занимает заметное время");
+    assert.ok(plant > 0);
   });
 
   test("мутация вида слабее зайца, крол — почти зайц", () => {
@@ -86,29 +85,18 @@ describe("баланс: пассивный доход ⚡", () => {
 });
 
 describe("баланс: энергия экосистемы", () => {
-  test("цепочка зайцев даёт заметный доход ⚡", () => {
-    const { world, T, LIFE_DATA } = createWorld(16, 16);
+  test("охота в цепочке даёт ⚡", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
-    world.makeDish();
-    for (let i = 0; i < 6; i++) world.setPlant(8 + i, 8, T.STAGE_GRASS, 0);
     world.set(8, 9, T.HERB);
-    const herb = world.makeAgent(8, 9, T.HERB);
-    herb.energy = herb.thresh * 1.5;
-    herb.cool = 0;
-    world.agents = [herb];
-    world.set(9, 9, T.HERB);
-    const mate = world.makeAgent(9, 9, T.HERB);
-    mate.energy = mate.thresh * 1.5;
-    mate.cool = 0;
-    world.agents.push(mate);
-
-    let gained = 0;
-    for (let g = 0; g < 60; g++) {
-      world.step();
-      gained += world.pendingEnergy;
-      world.pendingEnergy = 0;
-    }
-    assert.ok(gained >= LIFE_DATA.arcadeEnergy.animalBirth, `ожидали доход от экосистемы, получили ${gained}`);
+    world.agents = [world.makeAgent(8, 9, T.HERB)];
+    const prey = world.makeAgent(8, 8, T.HERB);
+    const fox = world.makeAgent(9, 8, T.PRED);
+    world.agents.push(prey, fox);
+    world.set(8, 8, T.HERB);
+    world.set(9, 8, T.PRED);
+    world.killAgent(prey, fox, 7.2);
+    assert.ok(world.pendingEnergy >= 1);
   });
 });
 
