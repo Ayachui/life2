@@ -1069,9 +1069,10 @@ describe("размножение: зрелость", () => {
     world.set(6, 5, T.EMPTY);
     world.set(5, 6, T.EMPTY);
     world.set(4, 5, T.HERB);
+    world.setPlant(7, 5, T.STAGE_GRASS, 0);
     world.agents = [fox, world.makeAgent(4, 5, T.HERB)];
     let bred = false;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 80; i++) {
       world.stepAgents();
       if (world.agents.filter((a) => !a.dead && a.kind === T.PRED).length > 1) {
         bred = true;
@@ -1079,5 +1080,68 @@ describe("размножение: зрелость", () => {
       }
     }
     assert.ok(bred, "взрослая лиса должна когда-нибудь размножиться");
+  });
+});
+
+describe("грибы", () => {
+  test("корова сажает гриб на соседнюю пустую клетку", () => {
+    const { world, T } = createWorld();
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        world.set(5 + dx, 5 + dy, T.EMPTY);
+      }
+    }
+    assert.ok(world.tryPlantMushroomNear(5, 5));
+    let mushrooms = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        if (world.get(5 + dx, 5 + dy) === T.MUSHROOM) mushrooms++;
+      }
+    }
+    assert.equal(mushrooms, 1, "гриб должен появиться рядом с коровой");
+  });
+
+  test("съеденный гриб удваивает зрение и скорость хода", () => {
+    const { world, T, MUSHROOM_CFG } = createWorld();
+    const herb = world.makeAgent(5, 5, T.HERB);
+    herb.vision = 6;
+    herb.moveInterval = 4;
+    herb.energy = 1;
+    herb.thresh = 99;
+    world.agents = [herb];
+    world.set(6, 5, T.MUSHROOM);
+    assert.equal(world.effectiveVision(herb), 6);
+    assert.equal(world.moveIntervalFor(herb), 4);
+    world.feedHungryHerb(herb);
+    assert.equal(world.get(6, 5), T.EMPTY);
+    assert.equal(herb.skillBoost, true);
+    assert.equal(world.effectiveVision(herb), 12);
+    assert.equal(world.moveIntervalFor(herb), 2);
+    assert.ok(herb.energy >= MUSHROOM_CFG.energy);
+  });
+
+  test("гриб не продлевает жизнь крол-душегуба", () => {
+    const { world, T, KROL_LIFESPAN } = createWorld();
+    const krol = placeKrol(world, 5, 5, T);
+    krol.bornGen = 0;
+    world.generation = KROL_LIFESPAN - 1;
+    world.agents = [krol];
+    world.set(6, 5, T.MUSHROOM);
+    world.krolDevourCells(krol, [{ x: 6, y: 5 }]);
+    assert.equal(krol.skillBoost, true);
+    assert.equal(krol.bornGen, 0);
+    world.generation = KROL_LIFESPAN;
+    world.stepAgents();
+    assert.ok(krol.dead, "крол должен умереть по сроку жизни несмотря на гриб");
+  });
+
+  test("потомок не наследует бонус гриба", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    parent.skillBoost = true;
+    const baby = world.makeAgent(6, 5, T.HERB, parent);
+    assert.equal(baby.skillBoost, false);
   });
 });

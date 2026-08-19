@@ -796,6 +796,10 @@
           } else {
             drawEmoji("💧", x, y, s, 0.95);
           }
+        } else if (t === T.MUSHROOM) {
+          ctx.fillStyle = w.dish && w.inDish(x, y) ? "#0d2430" : "#08151d";
+          ctx.fillRect(x * s, y * s, s, s);
+          drawEmojiInCell("🍄", x, y, s);
         } else if (t === T.PLANT) {
           ctx.fillStyle = w.dish && w.inDish(x, y) ? "#0d2430" : "#08151d";
           ctx.fillRect(x * s, y * s, s, s);
@@ -964,12 +968,14 @@
         const left = Math.max(0, KROL_LIFESPAN - (w.generation - a.bornGen));
         note += `<br><span class="note">Осталось ~${left} циклов</span>`;
       }
+      const vision = w.effectiveVision ? w.effectiveVision(a) : a.vision;
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
-        : a.trait === "корова" ? `медленный (×4), восприятие ${a.vision} кл.`
-        : a.trait === "крол-душегуб" ? `2×2, зона разрушения 4×4, ×6 действий/цикл, восприятие ${a.vision} кл.`
-        : a.trait === "волк" ? `одиночка, восприятие ${a.vision} кл.`
-        : `восприятие ${a.vision} кл.`;
-      return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}`;
+        : a.trait === "корова" ? `медленный (×4), восприятие ${vision} кл.`
+        : a.trait === "крол-душегуб" ? `2×2, зона разрушения 4×4, ×6 действий/цикл, восприятие ${vision} кл.`
+        : a.trait === "волк" ? `одиночка, восприятие ${vision} кл.`
+        : `восприятие ${vision} кл.`;
+      const boostNote = a.skillBoost ? "<br><span class=\"note\">🍄 Бонус гриба: навыки ×2 (время жизни без изменений)</span>" : "";
+      return `<b>${who}</b><br>Сытость ${sat}% — ${mood}<br>${moveNote} · поколение ${a.gen}${note}${boostNote}`;
     }
     const t = w.get(x, y);
     if (t === T.PLANT) {
@@ -987,6 +993,7 @@
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
     }
     if (t === T.WATER) return "<b>Водоём</b><br>У берега растения растут вдвое быстрее. По воде можно идти, но вдвое медленнее.";
+    if (t === T.MUSHROOM) return "<b>Гриб</b><br>Корова сажает редко. Съешь — навыки и бонусы ×2, время жизни не меняется.";
     if (t === T.WALL) return "<b>Камень</b><br>Через камень никто не проходит.";
     return "<b>Пусто</b><br>Можно посадить траву или поставить зверя.";
   }
