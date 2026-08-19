@@ -710,7 +710,7 @@ describe("очки жизни", () => {
     assert.equal(world.lifePoints, 0);
   });
 
-  test("эволюция растений даёт очки", () => {
+  test("эволюция растений даёт очки по тиру", () => {
     const { world, T } = createWorld();
     world.arcade = true;
     world.set(2, 3, T.HERB);
@@ -718,34 +718,59 @@ describe("очки жизни", () => {
     world.setPlant(2, 2, T.STAGE_GRASS, 0);
     world.plantAge[world.idx(2, 2)] = 10;
     world.growPlants();
-    assert.ok(world.lifePoints >= 4);
-    assert.equal(world.get(2, 2), T.PLANT);
+    assert.equal(world.lifePoints, world.tierPoints("plant", 2));
     assert.equal(world.plantStageAt(2, 2), T.STAGE_BUSH);
   });
 
-  test("посадка и охота дают очки", () => {
-    const { world, T } = createWorld();
+  test("ручная посадка не даёт очков", () => {
+    const { world } = createWorld();
     world.arcade = true;
     world.paint(3, 3, "herb");
-    const placed = world.lifePoints;
-    assert.ok(placed >= 16);
-
-    const prey = world.agents[0];
-    const fox = world.makeAgent(6, 5, T.PRED);
-    world.set(6, 5, T.PRED);
-    world.agents.push(fox);
-    world.killAgent(prey, fox, 7.2);
-    assert.ok(world.lifePoints > placed);
+    world.paint(4, 4, "plant");
+    assert.equal(world.lifePoints, 0);
   });
 
-  test("мутация даёт очки", () => {
+  test("охота даёт больше очков у эволюционировавших хищников", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    const prey = world.makeAgent(3, 3, T.HERB);
+    world.set(3, 3, T.HERB);
+    const fox = world.makeAgent(4, 4, T.PRED);
+    world.set(4, 4, T.PRED);
+    const wolf = world.makeAgent(5, 5, T.PRED);
+    wolf.trait = "волк";
+    world.set(5, 5, T.PRED);
+    world.agents = [prey, fox, wolf];
+
+    world.killAgent(prey, fox, 7.2);
+    const foxPoints = world.lifePoints;
+
+    const prey2 = world.makeAgent(6, 6, T.HERB);
+    world.set(6, 6, T.HERB);
+    world.agents.push(prey2);
+    world.killAgent(prey2, wolf, 7.2);
+    const wolfGain = world.lifePoints - foxPoints;
+    assert.ok(wolfGain > 0);
+    assert.ok(wolfGain > foxPoints, "волк (тир 4) должен давать больше, чем лиса (тир 2)");
+  });
+
+  test("мутация и поколение усиливают очки", () => {
     const { world, T } = createWorld();
     world.arcade = true;
     const parent = world.makeAgent(3, 3, T.HERB);
+    parent.gen = 3;
     const baby = world.makeAgent(4, 3, T.HERB, parent);
     baby.trait = "коала";
     world.applySpeciesTrait(baby, "коала", 4, 3, parent);
-    assert.ok(world.lifePoints >= 25);
+    const withGen = world.lifePoints;
+
+    world.lifePoints = 0;
+    const fresh = world.makeAgent(5, 5, T.HERB);
+    fresh.gen = 1;
+    const baby2 = world.makeAgent(6, 5, T.HERB, fresh);
+    baby2.trait = "коала";
+    world.applySpeciesTrait(baby2, "коала", 6, 5, fresh);
+    assert.ok(withGen > world.lifePoints);
   });
 });
 

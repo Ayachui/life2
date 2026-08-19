@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 9 },
+  gameVersion: { stage: "alpha", major: 0, minor: 9, patch: 0 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -49,7 +49,37 @@ const LIFE_DATA = {
     fertilize: 1
   },
   plantEvolutionEnergy: 1,
-  // Очки жизни: сумма произведённой и переработанной жизненной энергии.
+  // Уровни эволюции: чем выше тир, тем больше очков за события цепочки.
+  evolutionTiers: {
+    plant: {
+      sprout: 1,
+      evolveGrass: 2,
+      evolveBush: 3,
+      wilt: 2,
+      fertilize: 2
+    },
+    agent: {
+      rabbit: 1,
+      koala: 2,
+      cow: 3,
+      fox: 2,
+      wolf: 4,
+      elk: 3,
+      bear: 5,
+      krol: 6
+    }
+  },
+  lifePointScale: {
+    base: 2,
+    birth: 4,
+    death: 2.5,
+    plant: 1,
+    mutation: 6,
+    activity: 1,
+    genBonus: 0.4,
+    genCap: 5
+  },
+  // Устаревшая таблица — оставлена для справки; очки считаются по evolutionTiers.
   lifePoints: {
     plant: {
       sprout: 2,

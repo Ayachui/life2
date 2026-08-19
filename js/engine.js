@@ -171,6 +171,14 @@ class World {
     return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.lifePoints) || {};
   }
 
+  tierConfig() {
+    return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.evolutionTiers) || { plant: {}, agent: {} };
+  }
+
+  pointScale() {
+    return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.lifePointScale) || {};
+  }
+
   agentLifeKey(a) {
     if (!a) return "rabbit";
     if (a.kind === BEAR) return "bear";
@@ -189,21 +197,64 @@ class World {
     return Number.isFinite(v) ? v : 0;
   }
 
+  agentTier(a) {
+    if (!a) return 1;
+    const tiers = this.tierConfig().agent || {};
+    return tiers[this.agentLifeKey(a)] ?? 1;
+  }
+
+  plantStageTier(stage) {
+    if (stage === STAGE_BUSH) return 2;
+    if (stage === STAGE_TREE) return 3;
+    return 1;
+  }
+
+  plantEventTier(eventKey) {
+    const tiers = this.tierConfig().plant || {};
+    return tiers[eventKey] ?? 1;
+  }
+
+  genPointMul(gen) {
+    const sc = this.pointScale();
+    const cap = sc.genCap ?? 5;
+    const bonus = sc.genBonus ?? 0.4;
+    const g = Math.min(Math.max(1, gen || 1), cap);
+    return 1 + bonus * (g - 1);
+  }
+
+  tierPoints(event, tier, gen = 1) {
+    const sc = this.pointScale();
+    const base = sc.base ?? 2;
+    const evtMul = sc[event] ?? 1;
+    return Math.max(1, Math.round(base * tier * evtMul * this.genPointMul(gen)));
+  }
+
   awardLifePoints(amount) {
     if (!this.arcade || !amount || amount <= 0) return;
     this.lifePoints += amount;
   }
 
   awardBirthPoints(agent) {
-    this.awardLifePoints(this.pointsFor("birth", this.agentLifeKey(agent)));
+    this.awardLifePoints(this.tierPoints("birth", this.agentTier(agent), agent?.gen));
   }
 
   awardDeathPoints(agent) {
-    this.awardLifePoints(this.pointsFor("death", this.agentLifeKey(agent)));
+    this.awardLifePoints(this.tierPoints("death", this.agentTier(agent), agent?.gen));
   }
 
-  awardProcessedEnergy(energy) {
-    this.awardLifePoints(Math.max(1, Math.round(energy)));
+  awardMutationPoints(agent) {
+    const tier = this.agentTier(agent);
+    const sc = this.pointScale();
+    const bonus = sc.mutation ?? 6;
+    this.awardLifePoints(Math.max(1, Math.round(bonus * tier * this.genPointMul(agent?.gen))));
+  }
+
+  awardProcessedEnergy(energy, eater = null, foodTier = 1) {
+    if (!this.arcade || !energy || energy <= 0) return;
+    const eaterTier = eater ? this.agentTier(eater) : 1;
+    const weight = 0.35 + eaterTier * 0.3 + foodTier * 0.35;
+    const points = Math.max(1, Math.round(energy * weight * this.genPointMul(eater?.gen)));
+    this.awardLifePoints(points);
   }
 
   idx(x, y) { return y * this.w + x; }
@@ -306,7 +357,7 @@ class World {
       if (this.get(c.x, c.y) !== PLANT) continue;
       const energy = this.plantEnergyRemaining(c.x, c.y);
       a.energy += energy;
-      this.awardProcessedEnergy(energy);
+      this.awardProcessedEnergy(energy, a, this.plantStageTier(this.plantStage[this.idx(c.x, c.y)]));
       this.clearPlant(c.x, c.y);
       this.spark(c.x, c.y, "#ffc14d");
       ate = true;
@@ -547,10 +598,10 @@ class World {
     return Math.max(0, 1 - this.noHerbGens / NO_ANIMAL_RENEWAL_GENS);
   }
 
-  awardPlantLifePoints(amount) {
-    const mul = this.ecosystemRewardMul();
-    if (!mul || !amount) return;
-    this.awardLifePoints(amount);
+  awardPlantLifePoints(eventKey) {
+    if (!this.ecosystemRewardMul()) return;
+    const tier = this.plantEventTier(eventKey);
+    this.awardLifePoints(this.tierPoints("plant", tier));
   }
 
   grantPlantArcadeEnergy(key) {
@@ -1278,7 +1329,6 @@ class World {
     if (brush === "plant") {
       if (!this.canPlaceAnimalAt(x, y)) return false;
       this.setPlant(x, y, STAGE_GRASS, 0);
-      this.awardLifePoints(this.pointsFor("plant", "place"));
       return true;
     }
     if (brush === "water") {
@@ -1299,8 +1349,6 @@ class World {
       this.set(x, y, kind);
       const agent = this.makeAgent(x, y, kind);
       this.agents.push(agent);
-      this.awardLifePoints(this.pointsFor("place", brush));
-      this.awardBirthPoints(agent);
       return true;
     }
     return false;
@@ -1357,7 +1405,7 @@ class World {
     this.mutations++;
     if (baby.kind === HERB) this.mutHerb++;
     else this.mutPred++;
-    this.awardLifePoints(this.pointsFor("mutation", trait));
+    this.awardMutationPoints(baby);
     this.awardBirthPoints(baby);
     const energy = this.grantMutationEnergy(trait);
     this.lastMutation = { kind: baby.kind, trait, special: true, x: baby.x, y: baby.y, energy };
@@ -1575,7 +1623,7 @@ class World {
     });
     this.fx.push({ x, y, color: "#8b6914", t: 1.4, fert: true });
     this.chime("fertilize");
-    this.awardLifePoints(this.pointsFor("activity", "fertilize"));
+    this.awardLifePoints(this.tierPoints("activity", this.plantEventTier("fertilize")));
     this.grantArcadeEnergy("fertilize");
   }
 
@@ -1598,7 +1646,7 @@ class World {
     this.births++;
     this.spark(x, y, "#5dff8a");
     this.chime("sprout");
-    this.awardPlantLifePoints(this.pointsFor("plant", "sprout"));
+    this.awardPlantLifePoints("sprout");
     this.grantPlantArcadeEnergy("plantSprout");
     return true;
   }
@@ -1618,7 +1666,7 @@ class World {
           this.setPlant(x, y, STAGE_BUSH, 0);
           this.spark(x, y, "#46d070");
           this.chime("evolve_bush");
-          this.awardPlantLifePoints(this.pointsFor("plant", "evolveGrass"));
+          this.awardPlantLifePoints("evolveGrass");
           this.grantPlantArcadeEnergy("plantEvolveGrass");
         } else if (stage === STAGE_BUSH) {
           if (this.plantAge[i] >= PLANT_CFG.bushToTree) {
@@ -1627,7 +1675,7 @@ class World {
             this.grantEvolutionEnergy();
             this.spark(x, y, "#2a9e50");
             this.chime("evolve_tree");
-            this.awardPlantLifePoints(this.pointsFor("plant", "evolveBush"));
+            this.awardPlantLifePoints("evolveBush");
           } else {
             const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
             for (const [dx, dy] of dirs) {
@@ -1646,7 +1694,7 @@ class World {
           this.clearPlant(x, y);
           this.spawnGrassAt(x, y);
           this.chime("wilt");
-          this.awardPlantLifePoints(this.pointsFor("plant", "wilt"));
+          this.awardPlantLifePoints("wilt");
           this.grantPlantArcadeEnergy("plantWilt");
         }
       }
@@ -1688,7 +1736,7 @@ class World {
       const gained = perBite * mult;
       this.plantBites[i]--;
       a.energy += gained;
-      this.awardProcessedEnergy(gained);
+      this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         a.eating = null;
@@ -1700,7 +1748,7 @@ class World {
       const gained = PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
       this.plantBites[i]--;
       a.energy += gained;
-      this.awardProcessedEnergy(gained);
+      this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         this.spawnGrassAt(meal.x, meal.y);
@@ -1739,7 +1787,7 @@ class World {
     this.addDecay(victim.x, victim.y, victim.kind);
     killer.energy += gain;
     this.awardDeathPoints(victim);
-    this.awardProcessedEnergy(gain);
+    this.awardProcessedEnergy(gain, killer, this.agentTier(victim));
     this.grantArcadeEnergy("hunt");
     this.spark(killer.x + (isKrolDushegub(killer) ? 1 : 0), killer.y + (isKrolDushegub(killer) ? 1 : 0), "#ff5d7a");
     if (!isKrolDushegub(killer) && killer.kind === BEAR) {
