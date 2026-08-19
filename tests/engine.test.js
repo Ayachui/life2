@@ -893,8 +893,8 @@ describe("аркада: энергия за действия", () => {
     assert.equal(world.pendingEnergy, 0);
   });
 
-  test("охота даёт ⚡", () => {
-    const { world, T, LIFE_DATA } = createWorld();
+  test("охота даёт очки, не ⚡", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
     world.set(2, 3, T.HERB);
     world.agents = [world.makeAgent(2, 3, T.HERB)];
@@ -903,8 +903,10 @@ describe("аркада: энергия за действия", () => {
     world.agents.push(prey, fox);
     world.set(3, 3, T.HERB);
     world.set(4, 3, T.PRED);
+    const pointsBefore = world.lifePoints;
     world.killAgent(prey, fox, 7.2);
-    assert.equal(world.pendingEnergy, LIFE_DATA.arcadeEnergy.hunt);
+    assert.equal(world.pendingEnergy, 0);
+    assert.ok(world.lifePoints > pointsBefore);
   });
 });
 

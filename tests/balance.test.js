@@ -30,9 +30,10 @@ describe("баланс: цены инструментов", () => {
 });
 
 describe("баланс: пассивный доход ⚡", () => {
-  test("таблица arcadeEnergy: только охота", () => {
+  test("таблица arcadeEnergy: нет повторяющегося ⚡", () => {
     const { LIFE_DATA } = createWorld();
-    assert.equal(LIFE_DATA.arcadeEnergy.hunt, 1);
+    assert.equal(LIFE_DATA.arcadeEnergy.hunt, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.koalaTreeBite, 0);
     assert.equal(LIFE_DATA.arcadeEnergy.animalBirth, 0);
     assert.equal(LIFE_DATA.arcadeEnergy.animalDeath, 0);
     assert.equal(LIFE_DATA.arcadeEnergy.plantEvolveBush, 0);
@@ -85,7 +86,7 @@ describe("баланс: пассивный доход ⚡", () => {
 });
 
 describe("баланс: энергия экосистемы", () => {
-  test("охота в цепочке даёт ⚡", () => {
+  test("охота в цепочке даёт очки, не ⚡", () => {
     const { world, T } = createWorld();
     world.arcade = true;
     world.set(8, 9, T.HERB);
@@ -95,8 +96,10 @@ describe("баланс: энергия экосистемы", () => {
     world.agents.push(prey, fox);
     world.set(8, 8, T.HERB);
     world.set(9, 8, T.PRED);
+    const pointsBefore = world.lifePoints;
     world.killAgent(prey, fox, 7.2);
-    assert.ok(world.pendingEnergy >= 1);
+    assert.equal(world.pendingEnergy, 0);
+    assert.ok(world.lifePoints > pointsBefore);
   });
 });
 

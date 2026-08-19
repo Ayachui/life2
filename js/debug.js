@@ -56,6 +56,7 @@
       `tools: plant ${b.tools.plant} herb ${b.tools.herb} pred ${b.tools.pred}`,
       `mut krol ${b.mutationChance.krol} koala ${b.mutationChance.koala}`,
       `arcade stale ${b.arcadeEnd.staleAfter} chain ${b.arcadeEnd.chainSustainGens}`,
+      `econ cap ${b.arcadeEconomy?.maxEnergyPerGen} decay ${b.arcadeEconomy?.surplusDecay} discov ${b.arcadeEconomy?.discoveryOnlyMutation}`,
       `roulette ${b.roulette.interval}`
     ].join("\n");
   }
@@ -71,16 +72,26 @@
     }
     const an = w.analytics();
     const mul = w.ecosystemRewardMul();
-    const inv = lib().lifeInvariantChecks(w);
-    const ledger = a.energyLedger || { spent: 0, earned: 0 };
-    const net = ledger.earned - ledger.spent;
+    const ledger = a.energyLedger || { spent: 0, earned: 0, upkeep: 0 };
+    const net = (ledger.earned || 0) - (ledger.spent || 0) - (ledger.upkeep || 0);
+    const hist = a.energyHistory || (w.economyLog || []).map((s) => s.player);
+    const spark = lib().sparkline?.(hist) || "—";
+    const auditLine = lib().energyAuditLine?.(w.energyAudit) || "";
+    const inv = lib().lifeInvariantChecks(w, {
+      energy: a.energy,
+      budget: w.arcadeBudget,
+      ledger
+    });
     body.innerHTML = `
       <div class="debug-section">
         <div>Сид: <code>${w.getRngSeed?.() ?? "—"}</code></div>
         <div>Режим: ${a.gameType || "—"} · ${a.difficulty?.label || "—"}</div>
         <div>Цикл: ${w.generation} · chain ${w.herbStreak}/${CHAIN_SUSTAIN_GENS} · noHerb ${w.noHerbGens}</div>
-        <div>⚡ ${a.energy} (spent ${ledger.spent}, earned ${ledger.earned}, net ${net}) · ecoMul ${mul.toFixed(2)}</div>
-        <div>Очки: ${w.lifePoints || 0} · pending ⚡ ${w.pendingEnergy}</div>
+        <div>⚡ ${a.energy} (spent ${ledger.spent}, earned ${ledger.earned}, upkeep ${ledger.upkeep || 0}, net ${net}) · ecoMul ${mul.toFixed(2)}</div>
+        <div>Очки: ${w.lifePoints || 0} · pending ⚡ ${w.pendingEnergy} · бюджет ${w.arcadeBudget ?? "—"}</div>
+        <div>Кривая ⚡: <code>${spark}</code></div>
+        <div>Аудит: ${auditLine}</div>
+        <div>Открытия: ${[...(w.discoveredTraits || [])].join(", ") || "—"}</div>
       </div>
       <div class="debug-section">
         <div>Трофика: 🌱${an.grass} 🌿${an.bush} 🌳${an.tree} · 🐰${an.herbs} 🦊${an.preds} 🐻${an.bears}</div>

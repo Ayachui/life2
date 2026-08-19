@@ -1,6 +1,6 @@
-/** Единый источник чисел баланса — Альфа 0.11.3. Тексты в data.js. */
+/** Единый источник чисел баланса — Альфа 0.12.0. Тексты в data.js. */
 const LIFE_BALANCE = {
-  version: { stage: "alpha", major: 0, minor: 11, patch: 3 },
+  version: { stage: "alpha", major: 0, minor: 12, patch: 0 },
 
   tools: {
     plant: 8,
@@ -27,10 +27,25 @@ const LIFE_BALANCE = {
     plantWilt: 0,
     animalBirth: 0,
     animalDeath: 0,
-    hunt: 1,
+    hunt: 0,
     krolDevour: 0,
     fertilize: 0,
-    koalaTreeBite: 1
+    koalaTreeBite: 0
+  },
+
+  /**
+   * ⚡ — стартовый бюджет на вмешательство, не доход с живого мира.
+   * Очки (lifePoints) по-прежнему растут с цепочкой.
+   */
+  arcadeEconomy: {
+    maxEnergyPerGen: 6,
+    discoveryOnlyMutation: true,
+    surplusDecay: 0.04,
+    upkeep: {
+      freeBiomass: 48,
+      perExtra: 0.04,
+      max: 4
+    }
   },
 
   mutationEnergy: {

@@ -1166,5 +1166,6 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
 .debug-warn .error { color: #ff5d7a; }
 .debug-warn .warn { color: #ffc14d; }
 .debug-warn .ok { color: #46e887; }
+.debug-spark { font-family: ui-monospace, Consolas, monospace; letter-spacing: -1px; }
 .debug-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .debug-actions .btn { font-size: 11px; padding: 6px 8px; }

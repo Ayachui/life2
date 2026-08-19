@@ -37,6 +37,32 @@ const PLAGUE_FOG_TICKS = BAL.roulette?.plagueFogTicks ?? 45;
 const SURVIVAL_POINT_INTERVAL = BAL.arcadeEnd?.survivalPointInterval ?? 100;
 const CHAIN_SUSTAIN_GENS = BAL.arcadeEnd?.chainSustainGens ?? 25;
 
+function emptyEnergyAudit() {
+  return {
+    hunt: 0,
+    koalaTreeBite: 0,
+    mutation: 0,
+    plantSprout: 0,
+    plantEvolveGrass: 0,
+    plantEvolveBush: 0,
+    plantWilt: 0,
+    animalBirth: 0,
+    animalDeath: 0,
+    krolDevour: 0,
+    fertilize: 0,
+    upkeep: 0,
+    capped: 0,
+    surplusDecay: 0,
+    other: 0
+  };
+}
+
+function addAudit(audit, key, amount) {
+  if (!audit || !amount) return;
+  if (Object.prototype.hasOwnProperty.call(audit, key)) audit[key] += amount;
+  else audit.other += amount;
+}
+
 const BREED_MIN_AGE = { ...(BAL.breed?.minAge || { herb: 12, pred: 18, koala: 14, cow: 22, wolf: 20 }) };
 const BREED_COOL_INIT = { ...(BAL.breed?.coolInit || { herb: 10, pred: 14 }) };
 const BREED_COOL_AFTER = { ...(BAL.breed?.coolAfter || { herb: 36, pred: 48, koala: 52 }) };
@@ -153,6 +179,12 @@ class World {
     this.sustainedChain = false;
     this.pendingEnergy = 0;
     this.lifePoints = 0;
+    this.arcadeBudget = null;
+    this.playerEnergy = null;
+    this.discoveredTraits = new Set();
+    this.energyAudit = emptyEnergyAudit();
+    this.energyAuditTick = emptyEnergyAudit();
+    this.economyLog = [];
     this.roulettePending = false;
     this.plagueFogTicks = 0;
     this.screenShake = 0;
@@ -633,6 +665,12 @@ class World {
     w.sustainedChain = this.sustainedChain;
     w.pendingEnergy = this.pendingEnergy;
     w.lifePoints = this.lifePoints;
+    w.arcadeBudget = this.arcadeBudget;
+    w.playerEnergy = this.playerEnergy;
+    w.discoveredTraits = new Set(this.discoveredTraits || []);
+    w.energyAudit = { ...(this.energyAudit || emptyEnergyAudit()) };
+    w.energyAuditTick = { ...(this.energyAuditTick || emptyEnergyAudit()) };
+    w.economyLog = Array.isArray(this.economyLog) ? this.economyLog.map((s) => ({ ...s })) : [];
     w._rngSeed = this._rngSeed;
     if (this._rngFn && typeof mulberry32 === "function") {
       w._rngFn = mulberry32(this._rngSeed ?? this._rngFn.getState());
@@ -716,7 +754,10 @@ class World {
     const raw = this.arcadeEnergyTable()[key] ?? 0;
     if (raw <= 0) return 0;
     const gain = mul >= 1 ? raw : Math.floor(raw * mul);
-    if (gain > 0) this.pendingEnergy += gain;
+    if (gain > 0) {
+      this.pendingEnergy += gain;
+      this.noteEnergyAudit(key, gain);
+    }
     return gain;
   }
 
@@ -1858,6 +1899,87 @@ class World {
     return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.arcadeEnergy) || {};
   }
 
+  arcadeEconomyCfg() {
+    if (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.arcadeEconomy) return LIFE_BALANCE.arcadeEconomy;
+    return {};
+  }
+
+  noteEnergyAudit(key, amount) {
+    if (!amount) return;
+    addAudit(this.energyAuditTick, key, amount);
+  }
+
+  foldEnergyAudit() {
+    const tick = this.energyAuditTick || emptyEnergyAudit();
+    const acc = this.energyAudit || (this.energyAudit = emptyEnergyAudit());
+    for (const key of Object.keys(acc)) {
+      acc[key] += tick[key] || 0;
+    }
+  }
+
+  arcadeUpkeep() {
+    if (!this.arcade) return 0;
+    const u = this.arcadeEconomyCfg().upkeep;
+    if (!u) return 0;
+    const c = this.counts();
+    const biomass = (c.plants || 0) + (c.herbs || 0) + (c.preds || 0) + (c.bears || 0);
+    const free = u.freeBiomass ?? 48;
+    if (biomass <= free) return 0;
+    const extra = biomass - free;
+    const raw = extra * (u.perExtra ?? 0.04);
+    return Math.min(u.max ?? 4, Math.max(0, Math.floor(raw)));
+  }
+
+  arcadeSurplusDecay() {
+    if (!this.arcade) return 0;
+    const rate = this.arcadeEconomyCfg().surplusDecay ?? 0;
+    const budget = this.arcadeBudget;
+    const energy = this.playerEnergy;
+    if (!rate || budget == null || energy == null || !Number.isFinite(energy)) return 0;
+    const projected = energy + this.pendingEnergy;
+    if (projected <= budget) return 0;
+    return Math.max(0, Math.ceil((projected - budget) * rate));
+  }
+
+  settleArcadeEconomy() {
+    if (!this.arcade) return;
+    const cap = this.arcadeEconomyCfg().maxEnergyPerGen;
+    if (cap != null && this.pendingEnergy > cap) {
+      this.noteEnergyAudit("capped", this.pendingEnergy - cap);
+      this.pendingEnergy = cap;
+    }
+    const upkeep = this.arcadeUpkeep();
+    if (upkeep > 0) {
+      this.noteEnergyAudit("upkeep", upkeep);
+      this.pendingEnergy -= upkeep;
+    }
+    const decay = this.arcadeSurplusDecay();
+    if (decay > 0) {
+      this.noteEnergyAudit("surplusDecay", decay);
+      this.pendingEnergy -= decay;
+    }
+    this.foldEnergyAudit();
+    const log = this.economyLog || (this.economyLog = []);
+    log.push({
+      g: this.generation,
+      pending: this.pendingEnergy,
+      player: this.playerEnergy,
+      granted: (this.energyAuditTick.hunt || 0)
+        + (this.energyAuditTick.koalaTreeBite || 0)
+        + (this.energyAuditTick.mutation || 0)
+        + (this.energyAuditTick.other || 0),
+      upkeep: this.energyAuditTick.upkeep || 0,
+      decay: this.energyAuditTick.surplusDecay || 0,
+      herbs: this.herbivoreCount(),
+      plants: this.counts().plants
+    });
+    if (log.length > 80) log.splice(0, log.length - 80);
+  }
+
+  energyAuditTotals() {
+    return { ...(this.energyAudit || emptyEnergyAudit()) };
+  }
+
   grantArcadeEnergy(key) {
     if (!this.arcade || !key) return 0;
     let gain = this.arcadeEnergyTable()[key] ?? 0;
@@ -1865,7 +1987,10 @@ class World {
     const mul = this.ecosystemRewardMul();
     if (mul <= 0) return 0;
     gain = Math.floor(gain * mul);
-    if (gain > 0) this.pendingEnergy += gain;
+    if (gain > 0) {
+      this.pendingEnergy += gain;
+      this.noteEnergyAudit(key, gain);
+    }
     return gain;
   }
 
@@ -1876,9 +2001,16 @@ class World {
     const raw = table[trait] ?? 5;
     const mul = this.ecosystemRewardMul();
     if (mul <= 0) return 0;
+    const eco = this.arcadeEconomyCfg();
+    if (eco.discoveryOnlyMutation !== false) {
+      const seen = this.discoveredTraits || (this.discoveredTraits = new Set());
+      if (seen.has(trait)) return 0;
+      seen.add(trait);
+    }
     const payoutMul = BAL.mutationEnergyPayoutMul ?? 0.5;
     const gain = Math.max(1, Math.floor(raw * mul * payoutMul));
     this.pendingEnergy += gain;
+    this.noteEnergyAudit("mutation", gain);
     return gain;
   }
 
@@ -2035,6 +2167,7 @@ class World {
     this.invalidateCountsCache();
     this.lastMutation = null;
     this.pendingEnergy = 0;
+    this.energyAuditTick = emptyEnergyAudit();
     this.sounds = [];
     this.tickAnimalMetrics();
     this.tickDecays();
@@ -2043,6 +2176,7 @@ class World {
     this.stepAgents();
     this.generation++;
     this.tickSurvivalPoints();
+    this.settleArcadeEconomy();
     if (this.plagueFogTicks > 0) this.plagueFogTicks--;
     if (this.screenShake > 0) this.screenShake--;
     if (this.arcade && this.generation > 0 && this.generation % ROULETTE_INTERVAL === 0) {

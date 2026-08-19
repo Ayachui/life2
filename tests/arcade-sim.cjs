@@ -46,6 +46,8 @@ function simulateArcade(ctx, {
   if (seed != null) world.setSeed(seed);
   world.arcade = true;
   world.makeDish();
+  world.arcadeBudget = startEnergy;
+  world.playerEnergy = startEnergy;
 
   let energy = startEnergy;
 
@@ -83,9 +85,11 @@ function simulateArcade(ctx, {
   spend();
 
   for (let g = 0; g < maxGens; g++) {
+    world.playerEnergy = energy;
     world.step();
-    energy += world.pendingEnergy;
+    energy = Math.max(0, energy + world.pendingEnergy);
     world.pendingEnergy = 0;
+    world.playerEnergy = energy;
     if (g % 2 === 0) spend();
     world.checkArcadeEnd(energy, herbCost);
     if (world.gameOver) {
@@ -121,6 +125,8 @@ function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost, plantCos
   const world = new World(28, 28);
   world.arcade = true;
   world.makeDish();
+  world.arcadeBudget = startEnergy;
+  world.playerEnergy = startEnergy;
   let energy = startEnergy;
   let gainedEnergy = 0;
   const cy = 14;
@@ -131,10 +137,12 @@ function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost, plantCos
     }
   }
   for (let g = 0; g < maxGens; g++) {
+    world.playerEnergy = energy;
     world.step();
-    gainedEnergy += world.pendingEnergy;
-    energy += world.pendingEnergy;
+    gainedEnergy += Math.max(0, world.pendingEnergy);
+    energy = Math.max(0, energy + world.pendingEnergy);
     world.pendingEnergy = 0;
+    world.playerEnergy = energy;
     world.checkArcadeEnd(energy, herbCost);
     if (world.gameOver) return { died: g + 1, reason: world.gameOverReason, energy, gainedEnergy };
   }

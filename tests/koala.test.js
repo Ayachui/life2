@@ -67,7 +67,7 @@ describe("коала: размножение", () => {
   });
 });
 
-describe("коала: поведение и ⚡", () => {
+describe("коала: поведение", () => {
   test("findNearestEmptyPerch избегает занятых деревьев", () => {
     const { world, T } = createWorld(12, 12);
     world.setPlant(5, 5, T.STAGE_TREE, 0);
@@ -79,13 +79,15 @@ describe("коала: поведение и ⚡", () => {
     assert.equal(spot.y, 5);
   });
 
-  test("укус листвы даёт ⚡ в аркаде", () => {
+  test("укус листвы кормит коалу, не даёт ⚡ игроку", () => {
     const { world, T } = createWorld(12, 12);
     world.arcade = true;
     world.setPlant(5, 5, T.STAGE_TREE, 0);
     const koala = makeKoala(world, 5, 5, T, { energy: 5, thresh: 20 });
+    const before = koala.energy;
     world.feedHungryKoala(koala);
-    assert.ok(world.pendingEnergy >= 1, "ожидали ⚡ за укус с дерева");
+    assert.ok(koala.energy > before, "коала должна поесть");
+    assert.equal(world.pendingEnergy, 0, "укус не должен капать ⚡ игроку");
   });
 
   test("на дереве ест даже если лиса рядом", () => {

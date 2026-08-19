@@ -43,11 +43,21 @@ describe("debug-lib", () => {
 });
 
 describe("LIFE_BALANCE snapshot", () => {
-  test("версия 0.11.3", () => {
+  test("версия 0.12.0", () => {
     const { LIFE_BALANCE } = createWorld();
-    assert.equal(LIFE_BALANCE.version.minor, 11);
-    assert.equal(LIFE_BALANCE.version.patch, 3);
+    assert.equal(LIFE_BALANCE.version.minor, 12);
+    assert.equal(LIFE_BALANCE.version.patch, 0);
     assert.equal(LIFE_BALANCE.tools.herb, 45);
     assert.equal(LIFE_BALANCE.plants.treeLife, 113);
+    assert.equal(LIFE_BALANCE.arcadeEnergy.hunt, 0);
+    assert.equal(LIFE_BALANCE.arcadeEconomy.discoveryOnlyMutation, true);
+  });
+});
+
+describe("debug-lib экономика", () => {
+  test("sparkline не падает на пустом ряде", () => {
+    const lib = loadDebugLib();
+    assert.equal(lib.sparkline([]), "—");
+    assert.ok(lib.sparkline([10, 20, 5]).length > 0);
   });
 });

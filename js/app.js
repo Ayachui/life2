@@ -26,7 +26,8 @@
     scoreSubmitted: false,
     rouletteResume: false,
     statsCacheKey: "",
-    energyLedger: { spent: 0, earned: 0 }
+    energyLedger: { spent: 0, earned: 0, upkeep: 0 },
+    energyHistory: []
   };
 
   const canvas = $("world");
@@ -475,6 +476,7 @@
       $("energy-val").textContent = text;
       pillPlay?.classList.remove("hidden");
       if ($("energy-val-play")) $("energy-val-play").textContent = text;
+      recordEnergyHistory();
     } else {
       pill.classList.add("hidden");
       pillPlay?.classList.add("hidden");
@@ -509,7 +511,8 @@
     app.inspect = null;
     app.tool = "plant";
     app.statsCacheKey = "";
-    app.energyLedger = { spent: 0, earned: 0 };
+    app.energyLedger = { spent: 0, earned: 0, upkeep: 0 };
+    app.energyHistory = [];
 
     if (gameType === "arcade" && difficulty) {
       app.energy = difficulty.energy;
@@ -520,6 +523,10 @@
     const world = new World(COLS, ROWS);
     world.makeDish();
     world.arcade = gameType === "arcade";
+    if (gameType === "arcade") {
+      world.arcadeBudget = difficulty?.energy ?? null;
+      world.playerEnergy = app.energy;
+    }
     if (gameType === "arcade" && window.TerrainArt) {
       TerrainArt.scatterArcadeTerrain(world);
     }
@@ -545,7 +552,7 @@
       $("game-title").textContent = "Аркада";
       $("game-subtitle").textContent = difficulty.label;
       $("hud-goal-title").textContent = "Цель";
-      $("hud-goal").textContent = `Набирай очки за живую цепочку: эволюция, мутации, охота. Энергия: ${difficulty.energy} ⚡`;
+      $("hud-goal").textContent = `Очки — за живую цепочку. ⚡ ${difficulty.energy} — бюджет на вмешательство, не ферма.`;
       $("hud-hint").textContent = difficulty.id === "hardcore"
         ? "В центре уже трава. Держи травоядных 25+ циклов — тогда идут очки за время."
         : "Без травоядных награды падают. Только хищники + лес — раунд кончится быстро.";
@@ -1111,14 +1118,31 @@
     setupWorld(gt, diff);
   }
 
-  function flushMutationEnergy() {
-    if (app.gameType !== "arcade" || !app.world?.pendingEnergy) return 0;
-    const gain = app.world.pendingEnergy;
-    app.energy += gain;
-    app.energyLedger.earned += gain;
+  function flushArcadeEnergy() {
+    if (app.gameType !== "arcade" || !app.world) return 0;
+    const gain = app.world.pendingEnergy || 0;
     app.world.pendingEnergy = 0;
+    if (!gain) {
+      return 0;
+    }
+    if (gain > 0) {
+      app.energy += gain;
+      app.energyLedger.earned += gain;
+    } else {
+      const lost = Math.min(app.energy, -gain);
+      app.energy -= lost;
+      app.energyLedger.upkeep += lost;
+    }
+    app.world.playerEnergy = app.energy;
     updateEnergy();
     return gain;
+  }
+
+  function recordEnergyHistory() {
+    if (app.gameType !== "arcade" || !Number.isFinite(app.energy)) return;
+    const hist = app.energyHistory || (app.energyHistory = []);
+    hist.push(app.energy);
+    if (hist.length > 80) hist.splice(0, hist.length - 80);
   }
 
   function energyBonusLabel(stepGain) {
@@ -1136,12 +1160,13 @@
     if (app.playing && !app.gameEnded) {
       acc += dt * ticksPerSec();
       while (acc >= 1) {
+        if (app.world) app.world.playerEnergy = app.energy;
         app.world.step();
+        flushWorldSounds(app.world);
+        const energyGain = flushArcadeEnergy();
         if (app.gameType === "arcade" && app.started) {
           app.world.checkArcadeEnd(app.energy, herbCost());
         }
-        flushWorldSounds(app.world);
-        const energyGain = flushMutationEnergy();
         if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
         acc -= 1;
         if (afterWorldStep(ts, energyGain)) break;
@@ -1241,9 +1266,13 @@
   };
   $("btn-step").onclick = () => {
     if (app.gameEnded || isKrolOverlayOpen()) return;
+    if (app.world) app.world.playerEnergy = app.energy;
     app.world.step();
     flushWorldSounds(app.world);
-    const energyGain = flushMutationEnergy();
+    const energyGain = flushArcadeEnergy();
+    if (app.gameType === "arcade" && app.started) {
+      app.world.checkArcadeEnd(app.energy, herbCost());
+    }
     if (energyGain > 0 && app.world.lastMutation) LifeSound.play("energy_bonus");
     afterWorldStep(performance.now(), energyGain);
     if (app.world.gameOver) gameOver();

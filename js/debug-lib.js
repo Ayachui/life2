@@ -1,5 +1,5 @@
 /** Хелперы отладки баланса — без DOM. */
-function lifeInvariantChecks(world) {
+function lifeInvariantChecks(world, meta = {}) {
   if (!world) return [{ level: "warn", text: "Мир не создан" }];
   const a = world.analytics();
   const warnings = [];
@@ -19,6 +19,16 @@ function lifeInvariantChecks(world) {
   if (world.arcade && world.noHerbGens >= (world.noHerbEndLimit?.() ?? 60) - 5) {
     warnings.push({ level: "error", text: `Нет травоядных ${world.noHerbGens} циклов` });
   }
+  const budget = meta.budget ?? world.arcadeBudget;
+  const energy = meta.energy;
+  if (world.arcade && energy != null && budget != null && Number.isFinite(energy) && energy > budget * 1.5) {
+    warnings.push({ level: "warn", text: `⚡ ${Math.round(energy)} выше старта ${budget} — ферма` });
+  }
+  const audit = world.energyAudit || {};
+  const drip = (audit.hunt || 0) + (audit.koalaTreeBite || 0);
+  if (drip > 8) {
+    warnings.push({ level: "error", text: `Повторяющийся доход ⚡ (охота/коала ${drip})` });
+  }
   return warnings;
 }
 
@@ -37,6 +47,11 @@ function lifeWorldSnapshot(world, meta = {}) {
     lonelyGens: world.lonelyGens,
     lifePoints: world.lifePoints,
     pendingEnergy: world.pendingEnergy,
+    arcadeBudget: world.arcadeBudget,
+    playerEnergy: world.playerEnergy,
+    discoveredTraits: [...(world.discoveredTraits || [])],
+    energyAudit: world.energyAudit ? { ...world.energyAudit } : null,
+    economyLog: Array.isArray(world.economyLog) ? world.economyLog.slice(-12) : [],
     ecosystemMul: mul,
     counts: {
       grass: a.grass,
@@ -61,6 +76,29 @@ function lifeWorldSnapshot(world, meta = {}) {
   };
 }
 
+function sparkline(values) {
+  if (!values || !values.length) return "—";
+  const bars = "▁▂▃▄▅▆▇█";
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (!nums.length) return "—";
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const span = Math.max(1, max - min);
+  return nums.map((v) => bars[Math.min(7, Math.floor(((v - min) / span) * 7))]).join("");
+}
+
+function energyAuditLine(audit) {
+  if (!audit) return "нет аудита";
+  const parts = [];
+  const show = ["mutation", "hunt", "koalaTreeBite", "upkeep", "surplusDecay", "capped"];
+  for (const k of show) {
+    const v = audit[k] || 0;
+    if (!v) continue;
+    parts.push(`${k} ${k === "upkeep" || k === "surplusDecay" || k === "capped" ? "−" : "+"}${v}`);
+  }
+  return parts.join(" · ") || "повторяющегося дохода нет";
+}
+
 function lifeSelfCheck(world, ctx = {}) {
   const results = [];
   const clone = world.clone();
@@ -73,7 +111,7 @@ function lifeSelfCheck(world, ctx = {}) {
   for (let i = 0; i < 80; i++) clone.step();
   const passive = clone.pendingEnergy;
   results.push({
-    ok: passive === 0,
+    ok: passive <= 0,
     name: "plants_only_no_passive_energy",
     detail: `pending=${passive}`
   });
@@ -103,9 +141,9 @@ function lifeSelfCheck(world, ctx = {}) {
 }
 
 if (typeof window !== "undefined") {
-  window.LifeDebugLib = { lifeInvariantChecks, lifeWorldSnapshot, lifeSelfCheck };
+  window.LifeDebugLib = { lifeInvariantChecks, lifeWorldSnapshot, lifeSelfCheck, sparkline, energyAuditLine };
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { lifeInvariantChecks, lifeWorldSnapshot, lifeSelfCheck };
+  module.exports = { lifeInvariantChecks, lifeWorldSnapshot, lifeSelfCheck, sparkline, energyAuditLine };
 }
