@@ -1,7 +1,11 @@
 const { Redis } = require("@upstash/redis");
 const {
-  KEY,
+  LEGACY_KEY,
+  MIGRATED_FLAG,
   MAX,
+  DIFFICULTIES,
+  keyForDifficulty,
+  emptyGrouped,
   redisFromEnv,
   parseBody,
   validDifficulty,
@@ -24,6 +28,45 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+async function trimKey(db, key) {
+  const size = await db.zcard(key);
+  if (size > MAX) await db.zpopmin(key, size - MAX);
+}
+
+async function migrateLegacy(db) {
+  if (await db.get(MIGRATED_FLAG)) return;
+
+  const raw = await db.zrange(LEGACY_KEY, 0, -1, { rev: true, withScores: true });
+  const scores = unpackScores(raw || []);
+  for (const score of scores) {
+    const entry = buildEntry({
+      name: score.name,
+      points: score.points,
+      cycles: score.cycles,
+      difficulty: score.difficulty
+    });
+    const key = keyForDifficulty(entry.difficulty);
+    await db.zadd(key, { score: entry.points, member: packMember(entry) });
+    await trimKey(db, key);
+  }
+
+  if (scores.length) await db.del(LEGACY_KEY);
+  await db.set(MIGRATED_FLAG, "1");
+}
+
+async function readGrouped(db) {
+  await migrateLegacy(db);
+  const grouped = emptyGrouped();
+  for (const difficulty of DIFFICULTIES) {
+    const raw = await db.zrange(keyForDifficulty(difficulty), 0, MAX - 1, {
+      rev: true,
+      withScores: true
+    });
+    grouped[difficulty] = unpackScores(raw || []);
+  }
+  return grouped;
+}
+
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -32,11 +75,11 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "GET") {
     if (!db) {
-      return res.status(200).json({ ok: true, scores: [], offline: true });
+      return res.status(200).json({ ok: true, scores: emptyGrouped(), offline: true });
     }
     try {
-      const raw = await db.zrange(KEY, 0, MAX - 1, { rev: true, withScores: true });
-      return res.status(200).json({ ok: true, scores: unpackScores(raw) });
+      const scores = await readGrouped(db);
+      return res.status(200).json({ ok: true, scores });
     } catch {
       return res.status(500).json({ ok: false, error: "read_failed" });
     }
@@ -67,9 +110,9 @@ module.exports = async function handler(req, res) {
     });
 
     try {
-      await db.zadd(KEY, { score: points, member: packMember(entry) });
-      const size = await db.zcard(KEY);
-      if (size > MAX) await db.zpopmin(KEY, size - MAX);
+      const key = keyForDifficulty(entry.difficulty);
+      await db.zadd(key, { score: points, member: packMember(entry) });
+      await trimKey(db, key);
       return res.status(200).json({ ok: true, saved: true });
     } catch {
       return res.status(500).json({ ok: false, error: "write_failed" });

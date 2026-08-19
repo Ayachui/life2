@@ -1,7 +1,34 @@
-const KEY = "life:arcade:leaderboard-v2";
+const LEGACY_KEY = "life:arcade:leaderboard-v2";
+const KEY_PREFIX = "life:arcade:leaderboard-v3";
+const MIGRATED_FLAG = `${KEY_PREFIX}:migrated`;
 const MAX = 50;
 
 const DIFFICULTIES = ["easy", "medium", "hard", "hardcore"];
+
+function keyForDifficulty(difficulty) {
+  return `${KEY_PREFIX}:${normalizeDifficulty(difficulty)}`;
+}
+
+function normalizeDifficulty(difficulty) {
+  return DIFFICULTIES.includes(difficulty) ? difficulty : "medium";
+}
+
+function emptyGrouped() {
+  return Object.fromEntries(DIFFICULTIES.map((d) => [d, []]));
+}
+
+function groupScores(scores) {
+  const grouped = emptyGrouped();
+  for (const score of scores) {
+    const difficulty = normalizeDifficulty(score.difficulty);
+    grouped[difficulty].push({ ...score, difficulty });
+  }
+  for (const difficulty of DIFFICULTIES) {
+    grouped[difficulty].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+    grouped[difficulty] = grouped[difficulty].slice(0, MAX);
+  }
+  return grouped;
+}
 
 function redisFromEnv(env = process.env) {
   const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
@@ -53,11 +80,12 @@ function validateCycles(cycles) {
 }
 
 function buildEntry({ name, points, cycles, difficulty }) {
+  const level = normalizeDifficulty(difficulty);
   return {
     name: sanitizeName(name),
     points,
     cycles: cycles ?? 0,
-    difficulty,
+    difficulty: level,
     date: new Date().toISOString().slice(0, 10)
   };
 }
@@ -108,9 +136,15 @@ function unpackScores(raw) {
 }
 
 module.exports = {
-  KEY,
+  LEGACY_KEY,
+  KEY_PREFIX,
+  MIGRATED_FLAG,
   MAX,
   DIFFICULTIES,
+  keyForDifficulty,
+  normalizeDifficulty,
+  emptyGrouped,
+  groupScores,
   redisFromEnv,
   parseBody,
   sanitizeName,
