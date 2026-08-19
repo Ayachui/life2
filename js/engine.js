@@ -71,6 +71,18 @@ const PLAGUE_FOG_TICKS = 45;
 const SURVIVAL_POINT_INTERVAL = 100;
 const CHAIN_SUSTAIN_GENS = 25;
 
+/** Минимум циклов жизни до первого размножения. */
+const BREED_MIN_AGE = {
+  herb: 12,
+  pred: 18,
+  koala: 14,
+  cow: 22,
+  wolf: 20
+};
+
+/** Стартовый кулдаун для посаженных зверей (дополнительно к возрасту). */
+const BREED_COOL_INIT = { herb: 10, pred: 14 };
+
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
 
 function isTrait(a, t) {
@@ -1434,6 +1446,20 @@ class World {
       : { energy: 8, hue: 38 + Math.random() * 22, vision: 7, drain: 0.4, thresh: 13, moveInterval: 1 };
   }
 
+  breedMinAge(a) {
+    if (isCow(a)) return BREED_MIN_AGE.cow;
+    if (isKoala(a)) return BREED_MIN_AGE.koala;
+    if (isWolf(a)) return BREED_MIN_AGE.wolf;
+    return a.kind === PRED ? BREED_MIN_AGE.pred : BREED_MIN_AGE.herb;
+  }
+
+  canTryBreed(a, wasSatedAtTickStart) {
+    if (a.kind === BEAR || isElk(a) || isKrolDushegub(a)) return false;
+    if (!wasSatedAtTickStart || a.energy < a.thresh || a.cool > 0) return false;
+    const age = this.generation - (a.bornGen ?? this.generation);
+    return age >= this.breedMinAge(a);
+  }
+
   makeAgent(x, y, kind, parent) {
     const d = this.defaultsFor(kind);
     const agent = {
@@ -1445,8 +1471,8 @@ class World {
       thresh: parent ? parent.thresh : d.thresh,
       trait: null,
       gen: parent ? parent.gen + 1 : 1,
-      bornGen: null,
-      cool: 0,
+      bornGen: this.generation,
+      cool: parent ? 0 : (kind === PRED ? BREED_COOL_INIT.pred : kind === HERB ? BREED_COOL_INIT.herb : 0),
       dead: false,
       eating: null,
       moveInterval: parent ? (parent.moveInterval || 1) : d.moveInterval,
@@ -2037,6 +2063,8 @@ class World {
     for (const a of order) {
       if (a.dead) continue;
 
+      const wasSated = a.energy >= a.thresh;
+
       if (isKrolDushegub(a) && a.bornGen != null && this.generation - a.bornGen >= KROL_LIFESPAN) {
         this.dieAgent(a, "krol_burnout");
         continue;
@@ -2072,7 +2100,7 @@ class World {
 
       if (a.dead) continue;
 
-      if (a.kind !== BEAR && !isElk(a) && !isKrolDushegub(a) && a.energy >= a.thresh && a.cool <= 0) {
+      if (this.canTryBreed(a, wasSated)) {
         let breedChance = 1;
         if (a.kind === HERB && c.herbs > 0) {
           const edible = c.grass + c.bush * PLANT_CFG.bushFoodWeight;
