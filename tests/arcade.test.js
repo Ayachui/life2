@@ -219,6 +219,32 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     assert.ok((world.energyAudit.pulse || 0) >= 8);
   });
 
+  test("в эре густой лес не блокирует ⚡ ниже cap", () => {
+    const { world, T, LIFE_BALANCE } = createWorld(16, 16);
+    world.arcade = true;
+    world.sustainedChain = true;
+    world.playerEnergy = 5;
+    world.arcadeBudget = 500;
+    world.set(4, 4, T.HERB);
+    world.agents = [world.makeAgent(4, 4, T.HERB)];
+    for (let y = 1; y < 15; y++) {
+      for (let x = 1; x < 15; x++) {
+        if (x === 4 && y === 4) continue;
+        world.setPlant(x, y, T.STAGE_GRASS, 0);
+      }
+    }
+    let energy = 5;
+    for (let i = 0; i < 20; i++) {
+      world.playerEnergy = energy;
+      world.step();
+      energy = Math.max(0, energy + world.pendingEnergy);
+      world.pendingEnergy = 0;
+    }
+    assert.ok(energy > 5, `⚡ должна расти, получили ${energy}`);
+    assert.ok(energy <= LIFE_BALANCE.arcadeEconomy.pulseCap);
+    assert.equal(world.energyAudit.upkeep || 0, 0);
+  });
+
   test("импульс не копится выше cap", () => {
     const { world, T, LIFE_BALANCE } = createWorld();
     const cap = LIFE_BALANCE.arcadeEconomy.pulseCap;

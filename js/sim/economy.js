@@ -26,6 +26,10 @@ World.prototype.arcadeUpkeep = function arcadeUpkeep() {
     if (!this.arcade || !this.sustainedChain) return 0;
     const u = this.arcadeEconomyCfg().upkeep;
     if (!u || !(u.max > 0)) return 0;
+    const energy = Number.isFinite(this.playerEnergy) ? this.playerEnergy : 0;
+    const projected = energy + this.pendingEnergy;
+    const cap = this.arcadePulseCap();
+    if (projected <= cap) return 0;
     const c = this.counts();
     const biomass = (c.plants || 0) + (c.herbs || 0) + (c.preds || 0) + (c.bears || 0);
     const free = u.freeBiomass ?? 48;
