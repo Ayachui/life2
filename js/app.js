@@ -22,7 +22,8 @@
     gameEnded: false,
     krolResumePlaying: false,
     resumeGameOverAfterModal: false,
-    lbTab: "easy"
+    lbTab: "easy",
+    scoreSubmitted: false
   };
 
   const canvas = $("world");
@@ -167,7 +168,19 @@
     $("gameover-title").textContent = title;
     $("gameover-score").innerHTML = `${points} <span>очков</span>`;
     $("gameover-meta").textContent = `${diff.label} · ${cycles} циклов · осталось ⚡ ${app.energy}`;
+    updateGameOverSubmitState();
     $("gameover-overlay").classList.remove("hidden");
+  }
+
+  function updateGameOverSubmitState() {
+    const btn = $("go-submit");
+    const nameInput = $("go-name");
+    if (!btn) return;
+    const done = app.scoreSubmitted;
+    btn.disabled = done;
+    btn.classList.toggle("disabled", done);
+    btn.textContent = done ? "Уже записано" : "В таблицу";
+    if (nameInput) nameInput.disabled = done;
   }
 
   function isKrolOverlayOpen() {
@@ -396,6 +409,7 @@
     app.playing = false;
     app.started = false;
     app.gameEnded = false;
+    app.scoreSubmitted = false;
     app.krolResumePlaying = false;
     app.resumeGameOverAfterModal = false;
     dismissKrolOverlay(false);
@@ -1107,10 +1121,13 @@
   $("go-menu").onclick = () => { hideGameOverOverlay(); showScreen("screen-menu"); };
   $("go-retry").onclick = () => { hideGameOverOverlay(); startArcade(app.difficulty); };
   $("go-submit").onclick = async () => {
+    if (app.scoreSubmitted) return;
     const name = $("go-name").value.trim() || "Аноним";
     const cycles = app.world.generation;
     const points = app.world.lifePoints;
     const result = await LifeLeaderboard.submitScore({ name, points, cycles, difficulty: app.difficulty.id });
+    app.scoreSubmitted = true;
+    updateGameOverSubmitState();
     hideGameOverOverlay();
     if (result.saved) {
       LifeSound.play("score");
