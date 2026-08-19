@@ -1,6 +1,12 @@
 {
   "version": 1,
   "hooks": {
+    "sessionStart": [
+      {
+        "command": "node .cursor/hooks/ship-to-prod.cjs --sync",
+        "timeout": 60
+      }
+    ],
     "stop": [
       {
         "command": "node .cursor/hooks/ship-to-prod.cjs",
@@ -8,6 +14,12 @@
       }
     ],
     "sessionEnd": [
+      {
+        "command": "node .cursor/hooks/ship-to-prod.cjs",
+        "timeout": 120
+      }
+    ],
+    "subagentStop": [
       {
         "command": "node .cursor/hooks/ship-to-prod.cjs",
         "timeout": 120

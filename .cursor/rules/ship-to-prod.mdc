@@ -1,15 +1,40 @@
 ---
-description: После чата merge origin в main, коммит, push origin/main, без веток
+description: Авто-ship в origin/main, одна ветка, без PR как финала
 alwaysApply: true
 ---
 
-# Конец работы — только main
+# Закон: только main
 
-Где бы ни шёл чат:
+**Не создавай ветки**, если пользователь явно не попросил. Не `cursor/*`, не feature/fix — одна рабочая ветка `main`.
 
-1. `git fetch origin && git checkout main && git merge origin/main`
-2. Чужую ветку влей в `main` и удали (локально и на origin)
-3. Коммит без секретов
+## Старт сессии (хук `sessionStart`)
+
+Хук сам: `fetch` → `checkout main` → `merge origin/main`.
+
+Агент дублирует при необходимости:
+
+```
+git fetch origin
+git checkout main
+git merge origin/main
+git status -sb
+```
+
+## Конец работы (хуки `stop`, `sessionEnd`, `subagentStop`)
+
+Хук `.cursor/hooks/ship-to-prod.cjs` **перекрывает** «не коммить, пока не попросили»:
+
+1. Коммит незакоммиченного (без `.env`, ключей, `credentials.json`)
+2. `checkout main`, merge `origin/main`
+3. Если работали не на `main` — merge в `main`, удалить ветку локально и на origin
 4. `git push origin main`
 
-Не оставляй `cursor/*`. Не `--force`. Версия на диске должна совпасть с origin (**0.11.0**, пока не смените на main).
+Вручную: `npm run ship`
+
+**Нельзя:** `--force` в `main`, `--no-verify`, пустой коммит, секреты, PR вместо push.
+
+При конфликте merge хук **не пушит** — агент разруливает и снова ship.
+
+## Версия
+
+Канон — `LIFE_DATA.gameVersion` на `origin/main` (сейчас смотри в `js/balance.js` / `js/data.js` после sync). Не выдумывай номер с отставшего диска.

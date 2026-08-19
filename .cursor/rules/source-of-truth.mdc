@@ -1,11 +1,26 @@
 ---
-description: Одна ветка main, версия 0.11.0, всегда merge origin/main
+description: Прод = origin/main, одна ветка, версия с origin
 alwaysApply: true
 ---
 
-# Закон: main + версия 0.11.0
+# Источник правды
 
-- Единственная ветка — `main`. Не создавай `cursor/*` и другие ветки. Если среда уже на ветке — влей в `main` и удали ветку.
-- Версия — **Альфа 0.11.0** (`LIFE_DATA.gameVersion` на `origin/main`), пока её не сменят на main. Не 0.7 и не 0.12 с локальной копии.
-- Старт: `git fetch origin && git checkout main && git merge origin/main`
-- Финал: коммит на `main`, `git push origin main`. Не PR как единственный итог. Не `--force`.
+| Что | Где |
+|-----|-----|
+| Прод | `origin/main` → Vercel (`life.tzunki.com`) |
+| Версия | `LIFE_DATA.gameVersion` на `origin/main` |
+| Звери и баланс | `js/data.js` + `js/engine.js` после `merge origin/main` |
+
+## Закон веток
+
+- **Только `main`.** Ветки — только если пользователь **явно** попросил.
+- Cloud/локальный агент на чужой ветке → влить в `main`, удалить ветку (хук делает сам в конце сессии).
+- PR не заменяет `git push origin main`.
+
+## Sync перед работой
+
+```
+git fetch origin && git checkout main && git merge origin/main
+```
+
+Fast-forward обязателен. Конфликт — стоп, без `--force`.
