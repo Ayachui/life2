@@ -1,18 +1,23 @@
+const _B = typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE : {};
+const _T = _B.tools || {};
+const _D = _B.difficulties || {};
+const _R = _B.roulette || {};
+
 const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // Закон: номер только с origin/main. Сейчас Альфа 0.11.0 — не выдумывать 0.7/0.12.
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 11, patch: 0 },
+  gameVersion: _B.version || { stage: "alpha", major: 0, minor: 11, patch: 0 },
   tools: [
-    { id: "plant", label: "🌱 Трава", cost: 8 },
-    { id: "herb", label: "🐰 Заяц", cost: 45 },
-    { id: "pred", label: "🦊 Лиса", cost: 90 },
-    { id: "bear", label: "🐻 Медведь", cost: 175 },
-    { id: "water", label: "Водоём", glyph: "water", cost: 12 },
-    { id: "wall", label: "🪨 Камень", glyph: "stone", cost: 10 },
-    { id: "inspect", label: "🔎 Осмотр", cost: 0 },
-    { id: "erase", label: "🧹 Стереть", cost: 0 }
+    { id: "plant", label: "🌱 Трава", cost: _T.plant ?? 8 },
+    { id: "herb", label: "🐰 Заяц", cost: _T.herb ?? 45 },
+    { id: "pred", label: "🦊 Лиса", cost: _T.pred ?? 90 },
+    { id: "bear", label: "🐻 Медведь", cost: _T.bear ?? 175 },
+    { id: "water", label: "Водоём", glyph: "water", cost: _T.water ?? 12 },
+    { id: "wall", label: "🪨 Камень", glyph: "stone", cost: _T.wall ?? 10 },
+    { id: "inspect", label: "🔎 Осмотр", cost: _T.inspect ?? 0 },
+    { id: "erase", label: "🧹 Стереть", cost: _T.erase ?? 0 }
   ],
   toolHelp: {
     plant: "Посади траву. Сначала она маленькая, потом станет кустом, а потом — деревом. Дерево со временем засыхает и оставляет 1 траву. Куст при превращении в дерево сеет 2 травы на свободных соседних клетках.",
@@ -31,32 +36,16 @@ const LIFE_DATA = {
     "волк": "одиночка: уходит от других волков на 10 кл., потомство наследует вид",
     "лось": "ест всю растительность, каждые 5 ходов удобряет (+30% рост, 5 циклов)"
   },
-  mutationEnergy: {
-    "крол-душегуб": 28,
-    "коала": 14,
-    "корова": 18,
-    "волк": 20,
-    "лось": 16
-  },
-  arcadeEnergy: {
-    plantSprout: 0,
-    plantEvolveGrass: 0,
-    plantEvolveBush: 0,
-    plantWilt: 0,
-    animalBirth: 0,
-    animalDeath: 0,
-    hunt: 1,
-    krolDevour: 0,
-    fertilize: 0
-  },
+  mutationEnergy: { ...(_B.mutationEnergy || {
+    "крол-душегуб": 28, "коала": 14, "корова": 18, "волк": 20, "лось": 16
+  }) },
+  arcadeEnergy: { ...(_B.arcadeEnergy || {
+    plantSprout: 0, plantEvolveGrass: 0, plantEvolveBush: 0, plantWilt: 0,
+    animalBirth: 0, animalDeath: 0, hunt: 1, krolDevour: 0, fertilize: 0
+  }) },
   roulette: {
-    interval: 500,
-    weights: {
-      earthquake: 30,
-      flood: 30,
-      plague: 25,
-      evolution: 15
-    },
+    interval: _R.interval ?? 500,
+    weights: { ...(_R.weights || { earthquake: 30, flood: 30, plague: 25, evolution: 15 }) },
     labels: {
       earthquake: { icon: "🌋", title: "Землетрясение", desc: "Экран трясётся. Пропадает 10–30% всех растений." },
       flood: { icon: "🌊", title: "Наводнение", desc: "Вода заполняет 10–50% свободных клеток в чашке." },
@@ -65,39 +54,15 @@ const LIFE_DATA = {
     }
   },
   plantEvolutionEnergy: 1,
-  // Уровни эволюции: чем выше тир, тем больше очков за события цепочки.
-  evolutionTiers: {
-    plant: {
-      sprout: 1,
-      evolveGrass: 2,
-      evolveBush: 3,
-      wilt: 2,
-      fertilize: 2
-    },
-    agent: {
-      rabbit: 1,
-      koala: 2,
-      cow: 3,
-      fox: 2,
-      wolf: 4,
-      elk: 3,
-      bear: 5,
-      krol: 6
-    }
+  evolutionTiers: _B.evolutionTiers || {
+    plant: { sprout: 1, evolveGrass: 2, evolveBush: 3, wilt: 2, fertilize: 2 },
+    agent: { rabbit: 1, koala: 2, cow: 3, fox: 2, wolf: 4, elk: 3, bear: 5, krol: 6 }
   },
-  lifePointScale: {
-    base: 2,
-    birth: 4,
-    death: 2.5,
-    plant: 1,
-    mutation: 6,
-    activity: 1,
-    genBonus: 0.4,
-    genCap: 5,
-    survival: 4
-  },
+  lifePointScale: { ...(_B.lifePointScale || {
+    base: 2, birth: 4, death: 2.5, plant: 1, mutation: 6, activity: 1, genBonus: 0.4, genCap: 5, survival: 4
+  }) },
   // Устаревшая таблица — оставлена для справки; очки считаются по evolutionTiers.
-  lifePoints: {
+  lifePoints: { ...(_B.legacyLifePoints || {
     plant: {
       sprout: 2,
       evolveGrass: 4,
@@ -140,12 +105,12 @@ const LIFE_DATA = {
     activity: {
       fertilize: 5
     }
-  },
+  }) },
   difficulties: [
-    { id: "easy", label: "Лёгкий", energy: 1000, emoji: "🌿" },
-    { id: "medium", label: "Средний", energy: 500, emoji: "🌾" },
-    { id: "hard", label: "Сложный", energy: 250, emoji: "🔥" },
-    { id: "hardcore", label: "Хардкор", energy: 134, emoji: "💀" }
+    { id: "easy", label: "Лёгкий", energy: _D.easy ?? 1000, emoji: "🌿" },
+    { id: "medium", label: "Средний", energy: _D.medium ?? 500, emoji: "🌾" },
+    { id: "hard", label: "Сложный", energy: _D.hard ?? 250, emoji: "🔥" },
+    { id: "hardcore", label: "Хардкор", energy: _D.hardcore ?? 134, emoji: "💀" }
   ],
   rulesInfographic: {
     flow: [

@@ -137,17 +137,15 @@ describe("баланс: скорость экосистемы", () => {
 
 describe("баланс: мутации", () => {
   test("шанс крола 0.25%", () => {
-    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
-    const match = engineSrc.match(/krol:\s*([\d.]+)/);
-    assert.ok(match);
-    assert.equal(Number(match[1]), 0.0025);
+    const { LIFE_BALANCE, MUT_CHANCE } = createWorld();
+    assert.equal(LIFE_BALANCE.mutationChance.krol, 0.0025);
+    assert.equal(MUT_CHANCE.krol, 0.0025);
   });
 
   test("базовый шанс вида при рождении умеренный", () => {
-    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
-    const match = engineSrc.match(/koala:\s*([\d.]+)/);
-    assert.ok(match);
-    assert.equal(Number(match[1]), 0.02);
+    const { LIFE_BALANCE, MUT_CHANCE } = createWorld();
+    assert.equal(MUT_CHANCE.koala, 0.02);
+    assert.equal(LIFE_BALANCE.mutationChance.koala, 0.02);
   });
 
   test("буст мутации: ×2 за каждое поколение существа", () => {
@@ -172,9 +170,23 @@ describe("баланс: мутации", () => {
   });
 
   test("крол-душегуб: 6 действий за цикл", () => {
-    const engineSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "js", "engine.js"), "utf8");
-    const match = engineSrc.match(/KROL_MOVES_PER_TICK\s*=\s*(\d+)/);
-    assert.ok(match);
-    assert.equal(Number(match[1]), 6);
+    const { LIFE_BALANCE } = createWorld();
+    assert.equal(LIFE_BALANCE.species.krol.movesPerTick, 6);
+    assert.equal(LIFE_BALANCE.mutationChance.krol, 0.0025);
+  });
+
+  test("MUT_CHANCE совпадает с LIFE_BALANCE", () => {
+    const { LIFE_BALANCE, MUT_CHANCE } = createWorld();
+    assert.equal(MUT_CHANCE.krol, LIFE_BALANCE.mutationChance.krol);
+    assert.equal(MUT_CHANCE.koala, LIFE_BALANCE.mutationChance.koala);
+    assert.equal(MUT_CHANCE.cow, LIFE_BALANCE.mutationChance.cow);
+    assert.equal(MUT_CHANCE.wolf, LIFE_BALANCE.mutationChance.wolf);
+    assert.equal(MUT_CHANCE.elk, LIFE_BALANCE.mutationChance.elk);
+  });
+
+  test("roulette.interval единый источник", () => {
+    const { LIFE_DATA, LIFE_BALANCE } = createWorld();
+    assert.equal(LIFE_DATA.roulette.interval, LIFE_BALANCE.roulette.interval);
+    assert.equal(LIFE_BALANCE.roulette.interval, 500);
   });
 });

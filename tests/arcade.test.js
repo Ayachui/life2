@@ -2,13 +2,15 @@ const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const { loadEngine, createWorld } = require("./harness.cjs");
 const {
-  PLANT_COST,
-  HERB_COST,
-  PRED_COST,
   toolCost,
+  toolCosts,
   simulateArcade,
   simulatePlantsOnly
 } = require("./arcade-sim.cjs");
+
+function costs(ctx) {
+  return toolCosts(ctx);
+}
 
 function diff(LIFE_DATA, id) {
   return LIFE_DATA.difficulties.find((d) => d.id === id);
@@ -24,7 +26,9 @@ describe("аркада: стартовая энергия", () => {
   });
 
   test("хардкор: хватает на зайца и несколько трав", () => {
-    const { LIFE_DATA } = createWorld();
+    const ctx = loadEngine();
+    const { PLANT_COST, HERB_COST, PRED_COST } = costs(ctx);
+    const { LIFE_DATA } = ctx;
     const hardcore = diff(LIFE_DATA, "hardcore");
     assert.ok(hardcore.energy >= HERB_COST + PLANT_COST * 3,
       "минимум зайц + 3 травы");
@@ -33,14 +37,16 @@ describe("аркада: стартовая энергия", () => {
   });
 
   test("сложный: хватает на зайца, лису и траву", () => {
-    const { LIFE_DATA } = createWorld();
-    const hard = diff(LIFE_DATA, "hard");
+    const ctx = loadEngine();
+    const { PLANT_COST, HERB_COST, PRED_COST } = costs(ctx);
+    const hard = diff(ctx.LIFE_DATA, "hard");
     assert.ok(hard.energy >= HERB_COST + PRED_COST + PLANT_COST);
   });
 
   test("средний: хватает на зайца, лису и запас травы", () => {
-    const { LIFE_DATA } = createWorld();
-    const medium = diff(LIFE_DATA, "medium");
+    const ctx = loadEngine();
+    const { PLANT_COST, HERB_COST, PRED_COST } = costs(ctx);
+    const medium = diff(ctx.LIFE_DATA, "medium");
     assert.ok(medium.energy >= HERB_COST + PRED_COST + PLANT_COST * 5);
   });
 });
@@ -48,6 +54,7 @@ describe("аркада: стартовая энергия", () => {
 describe("аркада: таймер без зверей", () => {
   test("только трава: хардкор доживает до лимита ожидания", () => {
     const ctx = loadEngine();
+    const { PRED_COST } = costs(ctx);
     const hardcore = diff(ctx.LIFE_DATA, "hardcore");
     const r = simulatePlantsOnly(ctx, {
       startEnergy: hardcore.energy,

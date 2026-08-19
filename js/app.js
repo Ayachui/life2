@@ -24,7 +24,9 @@
     resumeGameOverAfterModal: false,
     lbTab: "easy",
     scoreSubmitted: false,
-    rouletteResume: false
+    rouletteResume: false,
+    statsCacheKey: "",
+    energyLedger: { spent: 0, earned: 0 }
   };
 
   const canvas = $("world");
@@ -504,6 +506,8 @@
     hideGameOverOverlay();
     app.inspect = null;
     app.tool = "plant";
+    app.statsCacheKey = "";
+    app.energyLedger = { spent: 0, earned: 0 };
 
     if (gameType === "arcade" && difficulty) {
       app.energy = difficulty.energy;
@@ -686,6 +690,7 @@
     if (ok) app.lastPaintCell = cellKey;
     if (ok && cost > 0) {
       app.energy -= cost;
+      app.energyLedger.spent += cost;
       updateEnergy();
     }
     if (ok && app.tool !== "inspect") LifeSound.play("paint", { brush: app.tool });
@@ -917,15 +922,18 @@
       { icon: "🦊", label: "Лисы", value: a.preds },
       { icon: "🐻", label: "Медведи", value: a.bears }
     ];
-    const grid = $("stats-grid");
-    grid.innerHTML = stats.map((s) => (
-      `<div class="stat-chip" title="${s.label}">`
-      + `<span class="stat-ico" aria-hidden="true">${s.icon}</span>`
-      + `<span class="stat-label">${s.label}</span>`
-      + `<strong>${s.value}</strong></div>`
-    )).join("");
+    const statsKey = `${w.generation}|${a.score}|${a.label}|${stats.map((s) => s.value).join(",")}|${a.herbSat}|${a.predSat}|${a.note}`;
+    if (statsKey !== app.statsCacheKey) {
+      app.statsCacheKey = statsKey;
+      const grid = $("stats-grid");
+      grid.innerHTML = stats.map((s) => (
+        `<div class="stat-chip" title="${s.label}">`
+        + `<span class="stat-ico" aria-hidden="true">${s.icon}</span>`
+        + `<span class="stat-label">${s.label}</span>`
+        + `<strong>${s.value}</strong></div>`
+      )).join("");
 
-    $("analytics").innerHTML = `
+      $("analytics").innerHTML = `
       <div class="meter">
         <div class="row"><span>Жизнеспособность</span><strong>${a.label} · ${a.score}%</strong></div>
         <div class="bar"><i style="width:${a.score}%"></i></div>
@@ -941,6 +949,7 @@
         <div class="bar sat fox"><i style="width:${a.preds ? a.predSat : 0}%"></i></div>
       </div>
     `;
+    }
     renderInspect();
   }
 
@@ -1103,6 +1112,7 @@
     if (app.gameType !== "arcade" || !app.world?.pendingEnergy) return 0;
     const gain = app.world.pendingEnergy;
     app.energy += gain;
+    app.energyLedger.earned += gain;
     app.world.pendingEnergy = 0;
     updateEnergy();
     return gain;
@@ -1311,5 +1321,6 @@
   updateSpeedButton();
   renderGameVersion();
   LifeMusic.start();
+  window.LifeApp = app;
   requestAnimationFrame(loop);
 })();

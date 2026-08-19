@@ -167,8 +167,8 @@
 
   function scatterArcadeTerrain(world, opts = {}) {
     const rng = opts.rng || Math.random;
-    const waterMax = opts.waterMax ?? 0.10;
-    const wallMax = opts.wallMax ?? 0.05;
+    const waterMax = opts.waterMax ?? (typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE.terrain?.waterMax : null) ?? 0.10;
+    const wallMax = opts.wallMax ?? (typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE.terrain?.wallMax : null) ?? 0.05;
     const protectCenter = opts.protectCenter !== false;
 
     const cells = dishCells(world);

@@ -8,9 +8,11 @@ function loadEngine() {
   const sandbox = { window: {} };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  const balance = fs.readFileSync(path.join(ROOT, "js/balance.js"), "utf8");
   const data = fs.readFileSync(path.join(ROOT, "js/data.js"), "utf8");
   const engine = fs.readFileSync(path.join(ROOT, "js/engine.js"), "utf8");
   const terrain = fs.readFileSync(path.join(ROOT, "js/terrain.js"), "utf8");
+  vm.runInContext(balance, sandbox);
   vm.runInContext(`${data}\nthis.LIFE_DATA = LIFE_DATA;`, sandbox);
   vm.runInContext(engine, sandbox);
   vm.runInContext(terrain, sandbox);
@@ -34,6 +36,8 @@ function createWorld(w = 24, h = 24) {
     SURVIVAL_POINT_INTERVAL: ctx.SURVIVAL_POINT_INTERVAL,
     CHAIN_SUSTAIN_GENS: ctx.CHAIN_SUSTAIN_GENS,
     LIFE_DATA: ctx.LIFE_DATA,
+    LIFE_BALANCE: ctx.LIFE_BALANCE,
+    MUT_CHANCE: ctx.MUT_CHANCE,
     TerrainArt: ctx.TerrainArt
   };
 }

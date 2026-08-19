@@ -879,22 +879,17 @@ describe("аркада: энергия за действия", () => {
     assert.equal(world.pendingEnergy, 0);
   });
 
-  test("рождение и смерть не дают пассивный ⚡", () => {
-    const { world, T } = createWorld();
+  test("рождение и смерть: таблица arcadeEnergy = 0", () => {
+    const { world, T, LIFE_DATA } = createWorld();
     world.arcade = true;
+    assert.equal(LIFE_DATA.arcadeEnergy.animalBirth, 0);
+    assert.equal(LIFE_DATA.arcadeEnergy.animalDeath, 0);
+    assert.equal(world.grantArcadeEnergy("animalBirth"), 0);
+    assert.equal(world.grantArcadeEnergy("animalDeath"), 0);
+    world.set(3, 3, T.HERB);
     const herb = world.makeAgent(3, 3, T.HERB);
     world.agents = [herb];
-    world.set(3, 3, T.HERB);
-    herb.energy = herb.thresh * 2;
-    herb.cool = 0;
-    world.generation = 1;
-    for (let i = 0; i < 40; i++) {
-      world.stepAgents();
-      world.generation++;
-    }
-    assert.equal(world.pendingEnergy, 0);
-    herb.energy = -1;
-    world.stepAgents();
+    world.dieAgent(herb);
     assert.equal(world.pendingEnergy, 0);
   });
 

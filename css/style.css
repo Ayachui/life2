@@ -1140,3 +1140,31 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   .tool { min-height: 34px; font-size: 17px; }
   .transport .btn { font-size: 10px; }
 }
+
+.debug-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9000;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  background: rgba(8, 18, 28, 0.94);
+  border: 1px solid rgba(70, 232, 135, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #c8e6d8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.debug-panel.hidden { display: none; }
+.debug-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.debug-head .debug-hint { opacity: 0.6; font-size: 11px; margin-left: auto; margin-right: 4px; }
+.debug-section { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.debug-pre { white-space: pre-wrap; font-size: 11px; opacity: 0.85; margin: 4px 0 0; }
+.debug-warn { margin: 4px 0 0; padding-left: 18px; }
+.debug-warn .error { color: #ff5d7a; }
+.debug-warn .warn { color: #ffc14d; }
+.debug-warn .ok { color: #46e887; }
+.debug-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.debug-actions .btn { font-size: 11px; padding: 6px 8px; }

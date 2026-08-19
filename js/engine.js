@@ -4,94 +4,52 @@ const STAGE_GRASS = 1;
 const STAGE_BUSH = 2;
 const STAGE_TREE = 3;
 
-const PLANT_CFG = {
-  grassToBush: 10,
-  bushToTree: 28,
-  treeLife: 113,
-  bushSpread: 0.037,
-  bushFoodWeight: 0.4,
-  bushViabilityWeight: 0.33,
-  grassBites: 2,
-  bushBites: 4,
-  grassEnergy: 3.5,
-  bushEnergyPerBite: 0.85,
-  treeBitesCow: 10,
-  treeBitesElk: 8,
-  treeEnergyPerBite: 0.45,
-  treeEnergyPerBiteCow: 2.0,
-  treeBitesPerTickCow: 3,
-  bushToTreeGrass: 2,
-  treeEnergyPerBiteKoala: 0.55
-};
+const BAL = typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE : {};
+const PLANT_CFG = { ...BAL.plants };
+const DECAY_CFG = { ...BAL.decay };
+const FERTILIZER_CFG = { ...(BAL.fertilizer || { ttl: 5, strength: 0.3 }) };
+const MUSHROOM_CFG = { ...(BAL.mushrooms || { cowInterval: 18, cowChance: 0.12, energy: 2.5 }) };
 
-const DECAY_CFG = {
-  herb: { radius: 2, strength: 0.08, ttl: 35 },
-  pred: { radius: 4, strength: 0.14, ttl: 55 },
-  bear: { radius: 5, strength: 0.16, ttl: 62 }
-};
+const TRAIT = { ...(BAL.traitIds || {
+  KROL: "крол-душегуб", KOALA: "коала", COW: "корова", WOLF: "волк", ELK: "лось"
+}) };
 
-const FERTILIZER_CFG = { ttl: 5, strength: 0.3 };
-const MUSHROOM_CFG = { cowInterval: 18, cowChance: 0.12, energy: 2.5 };
+const MUT_CHANCE = { ...(BAL.mutationChance || { krol: 0.0025, koala: 0.02, cow: 0.01, wolf: 0.02, elk: 0.02 }) };
 
-const TRAIT = {
-  KROL: "крол-душегуб",
-  KOALA: "коала",
-  COW: "корова",
-  WOLF: "волк",
-  ELK: "лось"
-};
+const KROL_LIFESPAN = BAL.species?.krol?.lifespan ?? 15;
+const KROL_DEATH_SPAWN = BAL.species?.krol?.deathSpawn ?? 3;
+const KROL_MOVES_PER_TICK = BAL.species?.krol?.movesPerTick ?? 6;
+const KROL_SIZE = BAL.species?.krol?.size ?? 2;
+const WOLF_SOLITUDE = BAL.behavior?.wolfSolitude ?? 10;
+const ELK_POOP_INTERVAL = BAL.behavior?.elkPoopInterval ?? 5;
+const KOALA_HIDE_RANGE = BAL.behavior?.koalaHideRange ?? 1;
+const SPECIES_CFG = typeof buildSpeciesCfg === "function"
+  ? buildSpeciesCfg(TRAIT, BAL.species || {})
+  : {};
 
-const MUT_CHANCE = {
-  krol: 0.0025,
-  koala: 0.02,
-  cow: 0.01,
-  wolf: 0.02,
-  elk: 0.02
-};
+const NO_ANIMAL_RENEWAL_GENS = BAL.arcadeEnd?.noAnimalRenewalGens ?? 90;
+const ARCADE_STALE_AFTER = BAL.arcadeEnd?.staleAfter ?? 40;
+const ARCADE_LONELY_MAX = BAL.arcadeEnd?.lonelyMax ?? 120;
+const ARCADE_NO_HERB_MAX = BAL.arcadeEnd?.noHerbMax ?? 60;
+const ARCADE_PRED_ONLY_MAX = BAL.arcadeEnd?.predOnlyMax ?? 35;
+const ROULETTE_INTERVAL = BAL.roulette?.interval ?? 500;
+const PLAGUE_FOG_TICKS = BAL.roulette?.plagueFogTicks ?? 45;
+const SURVIVAL_POINT_INTERVAL = BAL.arcadeEnd?.survivalPointInterval ?? 100;
+const CHAIN_SUSTAIN_GENS = BAL.arcadeEnd?.chainSustainGens ?? 25;
 
-const KROL_LIFESPAN = 15;
-const KROL_DEATH_SPAWN = 3;
-const KROL_MOVES_PER_TICK = 6;
-const KROL_SIZE = 2;
-const WOLF_SOLITUDE = 10;
-const ELK_POOP_INTERVAL = 5;
-const KOALA_HIDE_RANGE = 1;
-const SPECIES_CFG = {
-  [TRAIT.KOALA]: { energy: 12, drain: 0.28, thresh: 14, vision: 8, hue: 145, litter: 2, moveInterval: 2 },
-  [TRAIT.COW]: { energy: 50, drain: 1.2, thresh: 22, vision: 6, hue: 52, litter: 1, moveInterval: 4 },
-  [TRAIT.WOLF]: { energy: 14, drain: 0.52, thresh: 15, vision: 12, hue: 220, litter: 1, moveInterval: 1 },
-  [TRAIT.ELK]: { energy: 25, drain: 0.32, thresh: 17, vision: 9, hue: 185, litter: 1, moveInterval: 1 },
-  [TRAIT.KROL]: { energy: 15, drain: 0.5, thresh: 12, vision: 18, hue: 312, litter: 1, moveInterval: 1, movesPerTick: 6 }
-};
-
-const NO_ANIMAL_RENEWAL_GENS = 90;
-const ARCADE_STALE_AFTER = 40;
-const ARCADE_LONELY_MAX = 120;
-const ARCADE_NO_HERB_MAX = 60;
-const ARCADE_PRED_ONLY_MAX = 35;
-const ROULETTE_INTERVAL = 500;
-const PLAGUE_FOG_TICKS = 45;
-const SURVIVAL_POINT_INTERVAL = 100;
-const CHAIN_SUSTAIN_GENS = 25;
-
-/** Минимум циклов жизни до первого размножения. */
-const BREED_MIN_AGE = {
-  herb: 12,
-  pred: 18,
-  koala: 14,
-  cow: 22,
-  wolf: 20
-};
-
-/** Стартовый кулдаун для посаженных зверей (дополнительно к возрасту). */
-const BREED_COOL_INIT = { herb: 10, pred: 14 };
-const WATER_SLOW_MUL = 2;
-const WATER_GROWTH_MUL = 2;
+const BREED_MIN_AGE = { ...(BAL.breed?.minAge || { herb: 12, pred: 18, koala: 14, cow: 22, wolf: 20 }) };
+const BREED_COOL_INIT = { ...(BAL.breed?.coolInit || { herb: 10, pred: 14 }) };
+const BREED_COOL_AFTER = { ...(BAL.breed?.coolAfter || { herb: 36, pred: 48 }) };
+const WATER_SLOW_MUL = BAL.water?.slowMul ?? 2;
+const WATER_GROWTH_MUL = BAL.water?.growthMul ?? 2;
+const SCORING = BAL.scoring || {};
+const ROULETTE_PCT = BAL.roulette?.pct || {};
 
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
 
 function skillMul(a) {
-  return a?.skillBoost ? 2 : 1;
+  const mul = BAL.behavior?.skillBoostMul ?? 2;
+  return a?.skillBoost ? mul : 1;
 }
 
 function isTrait(a, t) {
@@ -198,6 +156,30 @@ class World {
     this.screenShake = 0;
     this.lastRouletteEvent = null;
     this.sounds = [];
+    this._countsCache = null;
+    this._rngSeed = null;
+    this._rngFn = typeof mulberry32 === "function"
+      ? mulberry32((Math.random() * 4294967296) >>> 0)
+      : null;
+  }
+
+  setSeed(seed) {
+    if (typeof mulberry32 !== "function") return this;
+    this._rngSeed = seed >>> 0;
+    this._rngFn = mulberry32(this._rngSeed);
+    return this;
+  }
+
+  getRngSeed() {
+    return this._rngSeed;
+  }
+
+  rng() {
+    return this._rngFn ? this._rngFn() : Math.random();
+  }
+
+  invalidateCountsCache() {
+    this._countsCache = null;
   }
 
   chime(name, opts = {}) {
@@ -209,10 +191,12 @@ class World {
   }
 
   tierConfig() {
+    if (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.evolutionTiers) return LIFE_BALANCE.evolutionTiers;
     return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.evolutionTiers) || { plant: {}, agent: {} };
   }
 
   pointScale() {
+    if (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.lifePointScale) return LIFE_BALANCE.lifePointScale;
     return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.lifePointScale) || {};
   }
 
@@ -295,7 +279,8 @@ class World {
   awardProcessedEnergy(energy, eater = null, foodTier = 1) {
     if (!this.arcade || !energy || energy <= 0) return;
     const eaterTier = eater ? this.agentTier(eater) : 1;
-    const weight = 0.35 + eaterTier * 0.3 + foodTier * 0.35;
+    const pe = SCORING.processedEnergy || {};
+    const weight = (pe.base ?? 0.35) + eaterTier * (pe.eaterTier ?? 0.3) + foodTier * (pe.foodTier ?? 0.35);
     const points = Math.max(1, Math.round(energy * weight * this.genPointMul(eater?.gen)));
     this.awardScaledEcoPoints(points);
   }
@@ -308,7 +293,8 @@ class World {
   /** Множитель шанса мутации: 2^(поколение − 1). Поколение 1 — базовый шанс. */
   mutationMultForGen(gen) {
     const g = Math.max(1, gen || 1);
-    return Math.pow(2, g - 1);
+    const base = BAL.mutationGenBase ?? 2;
+    return Math.pow(base, g - 1);
   }
 
   effectiveChance(base, gen) {
@@ -363,7 +349,7 @@ class World {
       { x: px - 2, y: py + 1 }
     ];
     for (let i = anchors.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [anchors[i], anchors[j]] = [anchors[j], anchors[i]];
     }
     return anchors;
@@ -530,7 +516,7 @@ class World {
   spawnGrassAround(x, y, count) {
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let i = dirs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
     }
     let spawned = 0;
@@ -626,6 +612,12 @@ class World {
     w.herbStreak = this.herbStreak;
     w.sustainedChain = this.sustainedChain;
     w.pendingEnergy = this.pendingEnergy;
+    w.lifePoints = this.lifePoints;
+    w._rngSeed = this._rngSeed;
+    if (this._rngFn && typeof mulberry32 === "function") {
+      w._rngFn = mulberry32(this._rngSeed ?? this._rngFn.getState());
+      w._rngFn.setState(this._rngFn.getState());
+    }
     w.sounds = [];
     return w;
   }
@@ -675,8 +667,10 @@ class World {
     const total = herbs + preds;
     if (preds <= 0 || total <= 0) return 1;
     const ratio = herbs / total;
-    if (ratio >= 0.4) return 1;
-    return Math.max(0.12, Math.min(1, ratio * 2.5));
+    const eco = SCORING.ecosystemMul || {};
+    const full = eco.herbShareFull ?? 0.4;
+    if (ratio >= full) return 1;
+    return Math.max(eco.minMul ?? 0.12, Math.min(1, ratio * (eco.ratioScale ?? 2.5)));
   }
 
   noHerbEndLimit() {
@@ -1052,7 +1046,7 @@ class World {
     const dy = ay - ty;
     if (!dx && !dy) {
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-      const d = dirs[Math.floor(Math.random() * 4)];
+      const d = dirs[Math.floor(this.rng() * 4)];
       return { x: ax + d[0], y: ay + d[1] };
     }
     if (Math.abs(dx) >= Math.abs(dy)) return { x: ax + Math.sign(dx), y: ay };
@@ -1098,7 +1092,7 @@ class World {
     if (!this.canMoveThisTick(a)) return false;
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (let i = dirs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
     }
     for (const [dx, dy] of dirs) {
@@ -1160,7 +1154,7 @@ class World {
       return;
     }
     if (a.kind === BEAR) {
-      if (Math.random() < 0.15) this.wanderAgent(a);
+      if (this.rng() < 0.15) this.wanderAgent(a);
       return;
     }
     if (isWolf(a)) {
@@ -1172,7 +1166,7 @@ class World {
     }
     if (isKoala(a)) {
       if (!this.shouldMoveThisTick(a)) return;
-      if (Math.random() >= this.wanderBiasChance()) return;
+      if (this.rng() >= this.wanderBiasChance()) return;
       const dir = this.seekKoalaHangout(a);
       const nx = a.x + dir.x;
       const ny = a.y + dir.y;
@@ -1181,7 +1175,7 @@ class World {
       return;
     }
     if (!this.shouldMoveThisTick(a)) return;
-    if (Math.random() >= this.wanderBiasChance()) return;
+    if (this.rng() >= this.wanderBiasChance()) return;
     const dir = a.kind === HERB || isElk(a) ? this.seekHerb(a) : this.seekPred(a);
     const nx = a.x + dir.x;
     const ny = a.y + dir.y;
@@ -1613,7 +1607,7 @@ class World {
   findNeighbor(x, y, type) {
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let i = dirs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
     }
     for (const [dx, dy] of dirs) {
@@ -1678,12 +1672,38 @@ class World {
   }
 
   defaultsFor(kind) {
+    const sp = BAL.species || {};
     if (kind === BEAR) {
-      return { energy: 22, hue: 28 + Math.random() * 16, vision: 5, drain: 0.36, thresh: 19, moveInterval: 1 };
+      const b = sp.bear || {};
+      return {
+        energy: b.energy ?? 22,
+        hue: (b.hueMin ?? 28) + this.rng() * (b.hueRange ?? 16),
+        vision: b.vision ?? 5,
+        drain: b.drain ?? 0.36,
+        thresh: b.thresh ?? 19,
+        moveInterval: b.moveInterval ?? 1
+      };
     }
-    return kind === PRED
-      ? { energy: 10, hue: 350 + Math.random() * 20, vision: 10, drain: 0.48, thresh: 14, moveInterval: 1 }
-      : { energy: 8, hue: 38 + Math.random() * 22, vision: 7, drain: 0.4, thresh: 13, moveInterval: 1 };
+    if (kind === PRED) {
+      const f = sp.fox || {};
+      return {
+        energy: f.energy ?? 10,
+        hue: (f.hueMin ?? 350) + this.rng() * (f.hueRange ?? 20),
+        vision: f.vision ?? 10,
+        drain: f.drain ?? 0.48,
+        thresh: f.thresh ?? 14,
+        moveInterval: f.moveInterval ?? 1
+      };
+    }
+    const r = sp.rabbit || {};
+    return {
+      energy: r.energy ?? 8,
+      hue: (r.hueMin ?? 38) + this.rng() * (r.hueRange ?? 22),
+      vision: r.vision ?? 7,
+      drain: r.drain ?? 0.4,
+      thresh: r.thresh ?? 13,
+      moveInterval: r.moveInterval ?? 1
+    };
   }
 
   breedMinAge(a) {
@@ -1745,7 +1765,7 @@ class World {
     baby.drain = cfg.drain;
     baby.thresh = cfg.thresh;
     baby.vision = cfg.vision;
-    baby.hue = cfg.hue + Math.random() * 8;
+    baby.hue = cfg.hue + this.rng() * 8;
     baby.moveInterval = cfg.moveInterval || 1;
     baby.movesPerTick = cfg.movesPerTick || 1;
     if (trait === TRAIT.KROL) {
@@ -1774,6 +1794,7 @@ class World {
   }
 
   arcadeEnergyTable() {
+    if (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.arcadeEnergy) return LIFE_BALANCE.arcadeEnergy;
     return (typeof LIFE_DATA !== "undefined" && LIFE_DATA.arcadeEnergy) || {};
   }
 
@@ -1790,11 +1811,13 @@ class World {
 
   grantMutationEnergy(trait) {
     if (!this.arcade || !trait) return 0;
-    const table = (typeof LIFE_DATA !== "undefined" && LIFE_DATA.mutationEnergy) || {};
+    const table = (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.mutationEnergy)
+      || (typeof LIFE_DATA !== "undefined" && LIFE_DATA.mutationEnergy) || {};
     const raw = table[trait] ?? 5;
     const mul = this.ecosystemRewardMul();
     if (mul <= 0) return 0;
-    const gain = Math.max(1, Math.floor(raw * mul * 0.5));
+    const payoutMul = BAL.mutationEnergyPayoutMul ?? 0.5;
+    const gain = Math.max(1, Math.floor(raw * mul * payoutMul));
     this.pendingEnergy += gain;
     return gain;
   }
@@ -1805,7 +1828,7 @@ class World {
 
   tryHerbSpeciesMutation(baby, x, y, parent = null) {
     if (baby.kind !== HERB) return false;
-    const roll = Math.random();
+    const roll = this.rng();
     let acc = 0;
     const order = [
       [TRAIT.KROL, MUT_CHANCE.krol],
@@ -1821,7 +1844,7 @@ class World {
 
   tryPredSpeciesMutation(baby, x, y) {
     if (baby.kind !== PRED) return false;
-    const roll = Math.random();
+    const roll = this.rng();
     let acc = 0;
     const order = [
       [TRAIT.WOLF, MUT_CHANCE.wolf],
@@ -1854,6 +1877,7 @@ class World {
   }
 
   counts() {
+    if (this._countsCache) return this._countsCache;
     let grass = 0, bush = 0, tree = 0, water = 0, walls = 0;
     for (let i = 0; i < this.cells.length; i++) {
       const v = this.cells[i];
@@ -1869,10 +1893,12 @@ class World {
     const preds = this.agents.filter((a) => a.kind === PRED && !a.dead).length;
     const bears = this.agents.filter((a) => a.kind === BEAR && !a.dead).length;
     const plants = grass + bush + tree;
-    return { grass, bush, tree, plants, herbs, preds, bears, water, walls, total: plants + herbs + preds + bears };
+    this._countsCache = { grass, bush, tree, plants, herbs, preds, bears, water, walls, total: plants + herbs + preds + bears };
+    return this._countsCache;
   }
 
   analytics() {
+    this.invalidateCountsCache();
     const c = this.counts();
     const herbSat = this.satietyOf(HERB);
     const predSat = this.satietyOf(PRED);
@@ -1946,6 +1972,7 @@ class World {
 
   step() {
     if (this.gameOver) return;
+    this.invalidateCountsCache();
     this.lastMutation = null;
     this.pendingEnergy = 0;
     this.sounds = [];
@@ -1969,7 +1996,7 @@ class World {
       || { earthquake: 30, flood: 30, plague: 25, evolution: 15 };
     const entries = Object.entries(weights);
     const total = entries.reduce((s, [, w]) => s + w, 0);
-    let roll = Math.random() * total;
+    let roll = this.rng() * total;
     for (const [key, weight] of entries) {
       roll -= weight;
       if (roll <= 0) return key;
@@ -1979,14 +2006,20 @@ class World {
 
   shuffleInPlace(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
   }
 
   randomPct(min, max) {
-    return min + Math.random() * (max - min);
+    return min + this.rng() * (max - min);
+  }
+
+  roulettePct(type) {
+    const range = ROULETTE_PCT[type];
+    if (range && range.length >= 2) return this.randomPct(range[0], range[1]);
+    return this.randomPct(0.1, 0.3);
   }
 
   applyRouletteEvent(type) {
@@ -1999,14 +2032,14 @@ class World {
           if (this.get(x, y) === PLANT) plants.push({ x, y });
         }
       }
-      pct.value = this.randomPct(0.1, 0.3);
+      pct.value = this.roulettePct("earthquake");
       const remove = Math.max(1, Math.floor(plants.length * pct.value));
       this.shuffleInPlace(plants);
       for (let i = 0; i < remove && i < plants.length; i++) {
         this.clearPlant(plants[i].x, plants[i].y);
         this.spark(plants[i].x, plants[i].y, "#8b7355");
       }
-      this.screenShake = 28;
+      this.screenShake = BAL.roulette?.screenShake ?? 28;
       detail = `Уничтожено ~${Math.round(pct.value * 100)}% растений`;
       this.chime("roulette_earthquake");
     } else if (type === "flood") {
@@ -2016,7 +2049,7 @@ class World {
           if (this.get(x, y) === EMPTY && (!this.dish || this.inDish(x, y))) empty.push({ x, y });
         }
       }
-      pct.value = this.randomPct(0.1, 0.5);
+      pct.value = this.roulettePct("flood");
       const add = Math.max(1, Math.floor(empty.length * pct.value));
       this.shuffleInPlace(empty);
       for (let i = 0; i < add && i < empty.length; i++) {
@@ -2026,7 +2059,7 @@ class World {
       this.chime("roulette_flood");
     } else if (type === "plague") {
       const live = this.agents.filter((a) => !a.dead && !isKrolDushegub(a));
-      pct.value = this.randomPct(0.1, 0.3);
+      pct.value = this.roulettePct("plague");
       const killN = Math.max(live.length > 0 ? 1 : 0, Math.floor(live.length * pct.value));
       this.shuffleInPlace(live);
       for (let i = 0; i < killN; i++) this.dieAgent(live[i]);
@@ -2036,17 +2069,17 @@ class World {
     } else if (type === "evolution") {
       const targets = this.agents.filter((a) => !a.dead && !a.trait
         && ((a.kind === HERB) || (a.kind === PRED)));
-      pct.value = this.randomPct(0.5, 1);
+      pct.value = this.roulettePct("evolution");
       const evolveN = Math.max(targets.length > 0 ? 1 : 0, Math.floor(targets.length * pct.value));
       this.shuffleInPlace(targets);
       let evolved = 0;
       for (let i = 0; i < evolveN; i++) {
         const a = targets[i];
         if (a.kind === HERB) {
-          const trait = Math.random() < 0.5 ? TRAIT.KOALA : TRAIT.COW;
+          const trait = this.rng() < 0.5 ? TRAIT.KOALA : TRAIT.COW;
           if (this.applySpeciesTrait(a, trait, a.x, a.y)) evolved++;
         } else if (a.kind === PRED) {
-          const trait = Math.random() < 0.5 ? TRAIT.WOLF : TRAIT.ELK;
+          const trait = this.rng() < 0.5 ? TRAIT.WOLF : TRAIT.ELK;
           if (this.applySpeciesTrait(a, trait, a.x, a.y)) evolved++;
         }
       }
@@ -2055,6 +2088,7 @@ class World {
     }
     this.lastRouletteEvent = { type, generation: this.generation, detail, pct: pct.value };
     this.roulettePending = false;
+    this.invalidateCountsCache();
     return this.lastRouletteEvent;
   }
 
@@ -2128,7 +2162,7 @@ class World {
     const fert = this.fertilizerBoost(x, y);
     let p = baseChance * (1 + fert) + boost;
     if (wet) p += 0.03;
-    if (Math.random() >= p) return false;
+    if (this.rng() >= p) return false;
     this.setPlant(x, y, STAGE_GRASS, 0);
     this.births++;
     this.spark(x, y, "#5dff8a");
@@ -2192,7 +2226,7 @@ class World {
     const target = this.findNearestEdible(a.x, a.y, a.vision || 7, "scout", a);
     if (!target) {
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-      const d = dirs[Math.floor(Math.random() * 4)];
+      const d = dirs[Math.floor(this.rng() * 4)];
       return { x: d[0], y: d[1] };
     }
     const step = this.stepToward(a.x, a.y, target.x, target.y);
@@ -2204,7 +2238,7 @@ class World {
     const target = this.findNearestPrey(a.x, a.y, this.effectiveVision(a), a);
     if (!target) {
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-      const d = dirs[Math.floor(Math.random() * 4)];
+      const d = dirs[Math.floor(this.rng() * 4)];
       return { x: d[0], y: d[1], target: null };
     }
     const step = this.stepToward(a.x, a.y, target.x, target.y);
@@ -2278,7 +2312,7 @@ class World {
   }
 
   killAgent(victim, killer, energyGain) {
-    const gain = energyGain ?? 7.2;
+    const gain = energyGain ?? (SCORING.huntEnergyGain ?? 7.2);
     this.clearAgentCells(victim);
     victim.dead = true;
     this.deaths++;
@@ -2322,15 +2356,15 @@ class World {
   }
 
   litterSize(a) {
-    if (isKoala(a)) return 2;
-    if (isCow(a)) return 1;
+    if (isKoala(a)) return BAL.species?.koala?.litter ?? 2;
+    if (isCow(a)) return BAL.species?.cow?.litter ?? 1;
     return 1;
   }
 
   stepAgents() {
     const order = this.agents.filter((a) => !a.dead);
     for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(this.rng() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
     const babies = [];
@@ -2356,7 +2390,7 @@ class World {
         a.stepsSinceMush = (a.stepsSinceMush || 0) + 1;
         if (a.stepsSinceMush >= MUSHROOM_CFG.cowInterval) {
           a.stepsSinceMush = 0;
-          if (Math.random() < MUSHROOM_CFG.cowChance) this.tryPlantMushroomNear(a.x, a.y);
+          if (this.rng() < MUSHROOM_CFG.cowChance) this.tryPlantMushroomNear(a.x, a.y);
         }
       }
 
@@ -2387,28 +2421,31 @@ class World {
 
       if (this.canTryBreed(a, wasSated)) {
         let breedChance = 1;
+        const bc = BAL.breed || {};
+        const hc = bc.herbCrowd || {};
+        const pr = bc.predRatio || {};
         if (a.kind === HERB && c.herbs > 0) {
           const edible = c.grass + c.bush * PLANT_CFG.bushFoodWeight;
-          if (c.herbs > edible * 0.85) breedChance = 0.25;
-          else if (c.herbs > edible * 0.55) breedChance = 0.55;
+          if (c.herbs > edible * (hc.hard ?? 0.85)) breedChance = hc.chanceHard ?? 0.25;
+          else if (c.herbs > edible * (hc.soft ?? 0.55)) breedChance = hc.chanceSoft ?? 0.55;
         } else if (a.kind === PRED && c.preds > 0) {
           if (c.herbs <= 0) breedChance = 0;
           else {
             const ratio = c.preds / Math.max(1, c.herbs);
-            if (ratio >= 1) breedChance = 0.12;
-            else if (ratio >= 0.5) breedChance = 0.3;
-            else if (ratio >= 0.25) breedChance = 0.5;
+            if (ratio >= (pr.r1 ?? 1)) breedChance = pr.c1 ?? 0.12;
+            else if (ratio >= (pr.r05 ?? 0.5)) breedChance = pr.c05 ?? 0.3;
+            else if (ratio >= (pr.r025 ?? 0.25)) breedChance = pr.c025 ?? 0.5;
           }
         }
-        if (Math.random() < breedChance) {
+        if (this.rng() < breedChance) {
           const litter = this.litterSize(a);
           let bred = false;
           for (let n = 0; n < litter; n++) {
             const spot = this.findBirthSpotFor(a);
             if (!spot) break;
             if (!bred) {
-              a.energy *= 0.5;
-              a.cool = a.kind === PRED ? 48 : 36;
+              a.energy *= bc.energyRetain ?? 0.5;
+              a.cool = a.kind === PRED ? BREED_COOL_AFTER.pred : BREED_COOL_AFTER.herb;
               bred = true;
             }
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
@@ -2473,3 +2510,4 @@ window.ARCADE_PRED_ONLY_MAX = ARCADE_PRED_ONLY_MAX;
 window.SURVIVAL_POINT_INTERVAL = SURVIVAL_POINT_INTERVAL;
 window.PLAGUE_FOG_TICKS = PLAGUE_FOG_TICKS;
 window.CHAIN_SUSTAIN_GENS = CHAIN_SUSTAIN_GENS;
+window.LIFE_BALANCE = typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE : BAL;

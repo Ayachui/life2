@@ -1,9 +1,16 @@
-const PLANT_COST = 8;
-const HERB_COST = 45;
-const PRED_COST = 90;
+const { loadEngine, createWorld } = require("./harness.cjs");
 
 function toolCost(LIFE_DATA, id) {
   return LIFE_DATA.tools.find((t) => t.id === id).cost;
+}
+
+function toolCosts(ctx) {
+  const { LIFE_DATA } = ctx;
+  return {
+    PLANT_COST: toolCost(LIFE_DATA, "plant"),
+    HERB_COST: toolCost(LIFE_DATA, "herb"),
+    PRED_COST: toolCost(LIFE_DATA, "pred")
+  };
 }
 
 function emptyCells(world, cx, cy, radius = 6) {
@@ -21,20 +28,37 @@ function emptyCells(world, cx, cy, radius = 6) {
  */
 function simulateArcade(ctx, {
   startEnergy,
-  herbCost = HERB_COST,
-  plantCost = PLANT_COST,
+  herbCost,
+  plantCost,
+  predCost,
   maxGens = 200,
   cx = 16,
-  cy = 16
+  cy = 16,
+  withPred = false,
+  seed
 }) {
+  const costs = toolCosts(ctx);
+  herbCost = herbCost ?? costs.HERB_COST;
+  plantCost = plantCost ?? costs.PLANT_COST;
+  predCost = predCost ?? costs.PRED_COST;
   const { World, LIFE_TYPES: T } = ctx;
   const world = new World(32, 32);
+  if (seed != null) world.setSeed(seed);
   world.arcade = true;
   world.makeDish();
 
   let energy = startEnergy;
 
   function spend() {
+    if (withPred && world.live(T.PRED).length === 0 && energy >= predCost && world.live(T.HERB).length > 0) {
+      const spots = emptyCells(world, cx, cy);
+      if (spots.length) {
+        const [x, y] = spots[0];
+        world.set(x, y, T.PRED);
+        world.agents.push(world.makeAgent(x, y, T.PRED));
+        energy -= predCost;
+      }
+    }
     if (world.live(T.HERB).length === 0 && energy >= herbCost) {
       const spots = emptyCells(world, cx, cy);
       if (spots.length) {
@@ -89,7 +113,10 @@ function simulateArcade(ctx, {
   };
 }
 
-function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost = HERB_COST, plantCost = PLANT_COST }) {
+function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost, plantCost }) {
+  const costs = toolCosts(ctx);
+  herbCost = herbCost ?? costs.HERB_COST;
+  plantCost = plantCost ?? costs.PLANT_COST;
   const { World, LIFE_TYPES: T } = ctx;
   const world = new World(28, 28);
   world.arcade = true;
@@ -115,10 +142,8 @@ function simulatePlantsOnly(ctx, { startEnergy, maxGens = 50, herbCost = HERB_CO
 }
 
 module.exports = {
-  PLANT_COST,
-  HERB_COST,
-  PRED_COST,
   toolCost,
+  toolCosts,
   simulateArcade,
   simulatePlantsOnly
 };
