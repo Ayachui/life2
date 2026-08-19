@@ -39,7 +39,9 @@ const CHAIN_SUSTAIN_GENS = BAL.arcadeEnd?.chainSustainGens ?? 25;
 
 const BREED_MIN_AGE = { ...(BAL.breed?.minAge || { herb: 12, pred: 18, koala: 14, cow: 22, wolf: 20 }) };
 const BREED_COOL_INIT = { ...(BAL.breed?.coolInit || { herb: 10, pred: 14 }) };
-const BREED_COOL_AFTER = { ...(BAL.breed?.coolAfter || { herb: 36, pred: 48 }) };
+const BREED_COOL_AFTER = { ...(BAL.breed?.coolAfter || { herb: 36, pred: 48, koala: 52 }) };
+const KOALA_CROWD = { ...(BAL.breed?.koalaCrowd || { soft: 0.65, hard: 0.9, chanceSoft: 0.45, chanceHard: 0.12 }) };
+const KOALA_PERCH_CAP = BAL.behavior?.koalaPerchCapacity || { tree: 1, bush: 0.5 };
 const WATER_SLOW_MUL = BAL.water?.slowMul ?? 2;
 const WATER_GROWTH_MUL = BAL.water?.growthMul ?? 2;
 const SCORING = BAL.scoring || {};
@@ -448,6 +450,24 @@ class World {
 
   koalaHidden(a) {
     return koalaPerchedOn(this, a);
+  }
+
+  koalaCount() {
+    return this.agents.filter((a) => !a.dead && isKoala(a)).length;
+  }
+
+  koalaPerchCapacity() {
+    const c = this.counts();
+    return c.tree * (KOALA_PERCH_CAP.tree ?? 1) + c.bush * (KOALA_PERCH_CAP.bush ?? 0.5);
+  }
+
+  isKoalaPerchOccupied(x, y) {
+    const o = this.agentAt(x, y);
+    return !!o && isKoala(o);
+  }
+
+  findNearestEmptyPerch(x, y, range) {
+    return this.findNearestThicket(x, y, range, false);
   }
 
   canAgentMoveTo(a, x, y) {
@@ -1140,7 +1160,8 @@ class World {
     return this.moveTowardTarget(a, tx, ty) || this.wanderAgent(a);
   }
 
-  wanderBiasChance() {
+  wanderBiasChance(a) {
+    if (isKoala(a) && !koalaPerchedOn(this, a)) return 0.12;
     return 0.35;
   }
 
@@ -1166,7 +1187,8 @@ class World {
     }
     if (isKoala(a)) {
       if (!this.shouldMoveThisTick(a)) return;
-      if (this.rng() >= this.wanderBiasChance()) return;
+      const perched = koalaPerchedOn(this, a);
+      if (perched && this.rng() >= this.wanderBiasChance(a)) return;
       const dir = this.seekKoalaHangout(a);
       const nx = a.x + dir.x;
       const ny = a.y + dir.y;
@@ -1175,7 +1197,7 @@ class World {
       return;
     }
     if (!this.shouldMoveThisTick(a)) return;
-    if (this.rng() >= this.wanderBiasChance()) return;
+    if (this.rng() >= this.wanderBiasChance(a)) return;
     const dir = a.kind === HERB || isElk(a) ? this.seekHerb(a) : this.seekPred(a);
     const nx = a.x + dir.x;
     const ny = a.y + dir.y;
@@ -1313,7 +1335,7 @@ class World {
     return picks[0]?.meal || null;
   }
 
-  findNearestThicket(x, y, range) {
+  findNearestThicket(x, y, range, allowOccupied = true) {
     let best = null;
     let bestScore = -1;
     for (let dy = -range; dy <= range; dy++) {
@@ -1323,13 +1345,18 @@ class World {
         const man = this.distMan(x, y, nx, ny);
         if (man > range || man === 0) continue;
         if (!this.isKoalaPerchCell(nx, ny)) continue;
+        const occupied = this.isKoalaPerchOccupied(nx, ny);
+        if (!allowOccupied && occupied) continue;
         const stage = this.plantStageAt(nx, ny);
-        let score = stage === STAGE_TREE ? 3 : 2;
+        let score = stage === STAGE_TREE ? 4 : 2;
+        if (occupied) score -= 5;
         for (const o of this.agents) {
           if (o.dead || !isKoala(o)) continue;
-          if (this.distMan(nx, ny, o.x, o.y) <= 2) score += 2;
+          const d = this.distMan(nx, ny, o.x, o.y);
+          if (d <= 1) score -= 3;
+          else if (d <= 2) score -= 1;
         }
-        score -= man * 0.05;
+        score -= man * 0.08;
         if (score > bestScore) {
           bestScore = score;
           best = { x: nx, y: ny };
@@ -1340,7 +1367,8 @@ class World {
   }
 
   seekKoalaHangout(a) {
-    const perch = this.findNearestThicket(a.x, a.y, a.vision || 8);
+    const perch = this.findNearestEmptyPerch(a.x, a.y, a.vision || 8)
+      || this.findNearestThicket(a.x, a.y, a.vision || 8, true);
     if (perch) {
       const step = this.stepToward(a.x, a.y, perch.x, perch.y);
       if (step) return { x: step.x - a.x, y: step.y - a.y };
@@ -1352,7 +1380,7 @@ class World {
     const aware = this.perceive(a);
 
     if (aware.threats.length) {
-      const hide = this.findNearestThicket(a.x, a.y, a.vision || 8);
+      const hide = this.findNearestThicket(a.x, a.y, a.vision || 8, true);
       if (hide) {
         this.nudgeToward(a, hide.x, hide.y);
         return;
@@ -1360,6 +1388,15 @@ class World {
       if (aware.touchThreat || aware.deadEnd) {
         const t = aware.threats[0];
         this.fleeFrom(a, t.x, t.y);
+        return;
+      }
+    }
+
+    if (!koalaPerchedOn(this, a)) {
+      const perch = this.findNearestEmptyPerch(a.x, a.y, a.vision || 8)
+        || this.findNearestThicket(a.x, a.y, a.vision || 8, true);
+      if (perch) {
+        this.nudgeToward(a, perch.x, perch.y);
         return;
       }
     }
@@ -1377,15 +1414,19 @@ class World {
     }
 
     if (aware.touchFood) {
-      this.startEating(a, aware.touchFood);
-      return;
+      const food = aware.touchFood;
+      const onTree = koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_TREE;
+      const onBush = koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_BUSH;
+      if ((food.stage === STAGE_TREE && onTree) || (food.stage === STAGE_BUSH && onBush)) {
+        this.startEating(a, food);
+        return;
+      }
     }
 
-    const target = aware.food[0];
+    const target = aware.food.find((f) => f.stage === STAGE_TREE)
+      || aware.food.find((f) => f.stage === STAGE_BUSH);
     if (target) {
       this.nudgeToward(a, target.x, target.y);
-      const after = this.findNearestEdible(a.x, a.y, 1, "touch", a);
-      if (after) this.startEating(a, after);
       return;
     }
 
@@ -1584,6 +1625,7 @@ class World {
 
   findBirthSpotFor(a) {
     if (!isKoala(a)) return this.findNeighbor(a.x, a.y, EMPTY);
+    if (!koalaPerchedOn(this, a)) return null;
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     let best = null;
     let bestScore = -1;
@@ -1594,14 +1636,18 @@ class World {
       if (!this.canPlaceAnimalAt(nx, ny)) continue;
       let score = 0;
       for (const [sx, sy] of dirs) {
-        if (this.isKoalaPerchCell(nx + sx, ny + sy)) score += 2;
+        const px = nx + sx;
+        const py = ny + sy;
+        if (!this.isKoalaPerchCell(px, py)) continue;
+        score += this.plantStageAt(px, py) === STAGE_TREE ? 3 : 1;
+        if (!this.isKoalaPerchOccupied(px, py)) score += 2;
       }
       if (score > bestScore) {
         bestScore = score;
         best = { x: nx, y: ny };
       }
     }
-    return best || this.findNeighbor(a.x, a.y, EMPTY);
+    return best;
   }
 
   findNeighbor(x, y, type) {
@@ -1716,6 +1762,12 @@ class World {
   canTryBreed(a, wasSatedAtTickStart) {
     if (a.kind === BEAR || isElk(a) || isKrolDushegub(a)) return false;
     if (!wasSatedAtTickStart || a.energy < a.thresh || a.cool > 0) return false;
+    if (isKoala(a)) {
+      if (!koalaPerchedOn(this, a)) return false;
+      if (this.plantStageAt(a.x, a.y) !== STAGE_TREE) return false;
+      const cap = this.koalaPerchCapacity();
+      if (cap > 0 && this.koalaCount() > cap) return false;
+    }
     const age = this.generation - (a.bornGen ?? this.generation);
     return age >= this.breedMinAge(a);
   }
@@ -2269,6 +2321,7 @@ class World {
       const gained = PLANT_CFG.treeEnergyPerBiteKoala * mult;
       a.energy += gained;
       this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
+      this.grantArcadeEnergy("koalaTreeBite");
       if (a.energy >= a.thresh) a.eating = null;
       this.chime("eat_tree");
     } else if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) {
@@ -2356,7 +2409,10 @@ class World {
   }
 
   litterSize(a) {
-    if (isKoala(a)) return BAL.species?.koala?.litter ?? 2;
+    if (isKoala(a)) {
+      const onTree = koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_TREE;
+      return onTree ? (BAL.species?.koala?.litterOnTree ?? 2) : (BAL.species?.koala?.litter ?? 1);
+    }
     if (isCow(a)) return BAL.species?.cow?.litter ?? 1;
     return 1;
   }
@@ -2424,10 +2480,17 @@ class World {
         const bc = BAL.breed || {};
         const hc = bc.herbCrowd || {};
         const pr = bc.predRatio || {};
-        if (a.kind === HERB && c.herbs > 0) {
+        if (a.kind === HERB && c.herbs > 0 && !isKoala(a)) {
           const edible = c.grass + c.bush * PLANT_CFG.bushFoodWeight;
           if (c.herbs > edible * (hc.hard ?? 0.85)) breedChance = hc.chanceHard ?? 0.25;
           else if (c.herbs > edible * (hc.soft ?? 0.55)) breedChance = hc.chanceSoft ?? 0.55;
+        } else if (isKoala(a)) {
+          const cap = this.koalaPerchCapacity();
+          if (cap > 0) {
+            const ratio = this.koalaCount() / cap;
+            if (ratio >= (KOALA_CROWD.hard ?? 0.9)) breedChance = KOALA_CROWD.chanceHard ?? 0.12;
+            else if (ratio >= (KOALA_CROWD.soft ?? 0.65)) breedChance = KOALA_CROWD.chanceSoft ?? 0.45;
+          }
         } else if (a.kind === PRED && c.preds > 0) {
           if (c.herbs <= 0) breedChance = 0;
           else {
@@ -2445,7 +2508,8 @@ class World {
             if (!spot) break;
             if (!bred) {
               a.energy *= bc.energyRetain ?? 0.5;
-              a.cool = a.kind === PRED ? BREED_COOL_AFTER.pred : BREED_COOL_AFTER.herb;
+              a.cool = isKoala(a) ? (BREED_COOL_AFTER.koala ?? BREED_COOL_AFTER.herb)
+                : a.kind === PRED ? BREED_COOL_AFTER.pred : BREED_COOL_AFTER.herb;
               bred = true;
             }
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
