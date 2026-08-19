@@ -487,6 +487,23 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   color: var(--amber);
   margin-top: 2px;
 }
+.tile-icon {
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.tile-icon--legend {
+  margin-right: 2px;
+  vertical-align: -3px;
+}
+.tool .tile-icon {
+  margin-right: 4px;
+}
+.tut-icon .tile-icon--tut {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
 .tool.disabled { opacity: 0.4; cursor: not-allowed; }
 
 .diff-grid {

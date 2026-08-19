@@ -30,10 +30,22 @@ describe("баланс: цены инструментов", () => {
 });
 
 describe("баланс: пассивный доход ⚡", () => {
+  test("таблица arcadeEnergy покрывает ключевые события", () => {
+    const { LIFE_DATA } = createWorld();
+    const keys = [
+      "plantEvolveGrass", "plantEvolveBush", "plantWilt",
+      "animalBirth", "animalDeath", "hunt", "fertilize"
+    ];
+    for (const key of keys) {
+      assert.ok(LIFE_DATA.arcadeEnergy[key] > 0, `${key} должен давать ⚡`);
+    }
+    assert.equal(LIFE_DATA.arcadeEnergy.plantSprout, 0, "прорастание не раздувает пассив");
+  });
+
   test("дерево окупает меньше половины травы", () => {
     const { LIFE_DATA, PLANT_CFG } = createWorld();
     const plant = toolCost(LIFE_DATA, "plant");
-    const evo = LIFE_DATA.plantEvolutionEnergy;
+    const evo = LIFE_DATA.arcadeEnergy.plantEvolveBush;
     const ticks = PLANT_CFG.grassToBush + PLANT_CFG.bushToTree;
     assert.ok(evo < plant * 0.5, "1 дерево не должно полностью окупать посадку");
     assert.ok(ticks >= 30, "эволюция занимает заметное время");
@@ -54,19 +66,50 @@ describe("баланс: пассивный доход ⚡", () => {
   });
 
   test("симуляция: лес из 8 трав не даёт быстрый бесконечный доход", () => {
-    const { world, T } = createWorld(16, 16);
-    world.arcade = true;
-    world.makeDish();
-    for (let i = 0; i < 8; i++) world.setPlant(8 + i, 8, T.STAGE_GRASS, 0);
+    let peak = 0;
+    for (let trial = 0; trial < 5; trial++) {
+      const { world, T } = createWorld(16, 16);
+      world.arcade = true;
+      world.makeDish();
+      for (let i = 0; i < 8; i++) world.setPlant(8 + i, 8, T.STAGE_GRASS, 0);
 
-    let totalEnergy = 0;
-    for (let g = 0; g < 80; g++) {
-      world.step();
-      totalEnergy += world.pendingEnergy;
+      let totalEnergy = 0;
+      for (let g = 0; g < 80; g++) {
+        world.step();
+        totalEnergy += world.pendingEnergy;
+      }
+      if (totalEnergy > peak) peak = totalEnergy;
     }
 
-    assert.ok(totalEnergy <= 35, `за 80 циклов ожидали ≤35 ⚡, получили ${totalEnergy}`);
-    assert.ok(totalEnergy >= 1, "хотя бы одно дерево должно созреть");
+    assert.ok(peak <= 130, `за 80 циклов ожидали ≤130 ⚡, пик ${peak}`);
+    assert.ok(peak >= 1, "хотя бы одно дерево должно созреть");
+  });
+});
+
+describe("баланс: энергия экосистемы", () => {
+  test("цепочка зайцев даёт заметный доход ⚡", () => {
+    const { world, T, LIFE_DATA } = createWorld(16, 16);
+    world.arcade = true;
+    world.makeDish();
+    for (let i = 0; i < 6; i++) world.setPlant(8 + i, 8, T.STAGE_GRASS, 0);
+    world.set(8, 9, T.HERB);
+    const herb = world.makeAgent(8, 9, T.HERB);
+    herb.energy = herb.thresh * 1.5;
+    herb.cool = 0;
+    world.agents = [herb];
+    world.set(9, 9, T.HERB);
+    const mate = world.makeAgent(9, 9, T.HERB);
+    mate.energy = mate.thresh * 1.5;
+    mate.cool = 0;
+    world.agents.push(mate);
+
+    let gained = 0;
+    for (let g = 0; g < 60; g++) {
+      world.step();
+      gained += world.pendingEnergy;
+      world.pendingEnergy = 0;
+    }
+    assert.ok(gained >= LIFE_DATA.arcadeEnergy.animalBirth, `ожидали доход от экосистемы, получили ${gained}`);
   });
 });
 
