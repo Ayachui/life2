@@ -61,8 +61,26 @@ describe("коала: размножение", () => {
     const cap = world.koalaPerchCapacity();
     assert.ok(cap > 0);
     assert.ok(
-      world.koalaCount() <= cap + 4,
+      world.koalaCount() <= cap + 2,
       `коал ${world.koalaCount()} при ёмкости ${cap}`
+    );
+  });
+
+  test("тысяча деревьев не даёт тысячу коал", () => {
+    const { world, T, LIFE_BALANCE } = createWorld(24, 24);
+    const max = LIFE_BALANCE.behavior.koalaPerchCapacity.max;
+    for (let y = 2; y < 22; y++) {
+      for (let x = 2; x < 22; x++) world.setPlant(x, y, T.STAGE_TREE, 0);
+    }
+    assert.ok(world.counts().tree > max * 4);
+    assert.equal(world.koalaPerchCapacity(), max);
+    makeKoala(world, 8, 8, T);
+    world.set(9, 8, T.EMPTY);
+    world.generation = 20;
+    for (let i = 0; i < 280; i++) world.step();
+    assert.ok(
+      world.koalaCount() <= max + 1,
+      `коал ${world.koalaCount()} при потолке ${max}`
     );
   });
 });
@@ -88,6 +106,20 @@ describe("коала: поведение", () => {
     world.feedHungryKoala(koala);
     assert.ok(koala.energy > before, "коала должна поесть");
     assert.equal(world.pendingEnergy, 0, "укус не должен капать ⚡ игроку");
+  });
+
+  test("лиса видит коалу на соседнем дереве", () => {
+    const { world, T } = createWorld(16, 16);
+    world.setPlant(8, 8, T.STAGE_TREE, 0);
+    makeKoala(world, 8, 8, T);
+    world.set(7, 8, T.EMPTY);
+    const fox = world.makeAgent(7, 8, T.PRED);
+    world.set(7, 8, T.PRED);
+    world.agents.push(fox);
+    const prey = world.findNearestPrey(fox.x, fox.y, 4, fox);
+    assert.ok(prey, "лиса должна находить коалу");
+    assert.equal(prey.x, 8);
+    assert.equal(prey.y, 8);
   });
 
   test("на дереве ест даже если лиса рядом", () => {

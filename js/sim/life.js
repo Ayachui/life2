@@ -164,7 +164,10 @@ World.prototype.koalaCount = function koalaCount() {
 
 World.prototype.koalaPerchCapacity = function koalaPerchCapacity() {
     const c = this.counts();
-    return c.tree * (KOALA_PERCH_CAP.tree ?? 1) + c.bush * (KOALA_PERCH_CAP.bush ?? 0.5);
+    const raw = c.tree * (KOALA_PERCH_CAP.tree ?? 1) + c.bush * (KOALA_PERCH_CAP.bush ?? 0.5);
+    const max = KOALA_PERCH_CAP.max;
+    if (max == null) return raw;
+    return Math.min(raw, max);
   };
 
 World.prototype.isKoalaPerchOccupied = function isKoalaPerchOccupied(x, y) {
@@ -381,7 +384,7 @@ World.prototype.preyPriority = function preyPriority(hunter, prey, px, py) {
     if (isKrolDushegub(hunter) && (isCow(prey) || isKoala(prey))) score -= 0.2;
     if (isWolf(hunter) && isCow(prey)) score -= 0.3;
     if (isWolf(hunter) && prey.kind === HERB) score -= 0.1;
-    if (isKoala(prey) && this.koalaHidden(prey)) score += 3;
+    if (isKoala(prey) && this.koalaHidden(prey)) score += 1.2;
     return score;
   };
 
@@ -404,7 +407,7 @@ World.prototype.findNearestAgent = function findNearestAgent(x, y, range, kinds,
     let best = null, bestScore = 99;
     for (const o of this.agents) {
       if (o.dead || !kinds.includes(o.kind)) continue;
-      if (hunter?.kind === PRED && !isWolf(hunter) && !isElk(hunter) && this.isSpecialHerb(o)) continue;
+      if (hunter?.kind === PRED && !isWolf(hunter) && !isElk(hunter) && isCow(o)) continue;
       const dx = o.x - x;
       const dy = o.y - y;
       const dist = distAt(dx, dy);
@@ -1042,7 +1045,7 @@ World.prototype.canTryBreed = function canTryBreed(a, wasSatedAtTickStart) {
       if (!koalaPerchedOn(this, a)) return false;
       if (this.plantStageAt(a.x, a.y) !== STAGE_TREE) return false;
       const cap = this.koalaPerchCapacity();
-      if (cap > 0 && this.koalaCount() > cap) return false;
+      if (cap > 0 && this.koalaCount() >= cap) return false;
     }
     const age = this.generation - (a.bornGen ?? this.generation);
     return age >= this.breedMinAge(a);
@@ -1311,6 +1314,11 @@ World.prototype.stepAgents = function stepAgents() {
           const litter = this.litterSize(a);
           let bred = false;
           for (let n = 0; n < litter; n++) {
+            if (isKoala(a)) {
+              const cap = this.koalaPerchCapacity();
+              const incoming = babies.filter((b) => isKoala(b)).length;
+              if (cap > 0 && this.koalaCount() + incoming >= cap) break;
+            }
             const spot = this.findBirthSpotFor(a);
             if (!spot) break;
             if (!bred) {

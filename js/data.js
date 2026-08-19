@@ -10,7 +10,7 @@ const _R = _B.roulette || {};
 
 const LIFE_DATA = {
   // Закон: номер только с origin/main после sync.
-  gameVersion: _B.version || { stage: "alpha", major: 0, minor: 13, patch: 0 },
+  gameVersion: _B.version || { stage: "alpha", major: 0, minor: 13, patch: 1 },
   tools: (_C.tools || []).map((tool) => ({
     ...tool,
     cost: _T[tool.id] ?? 0

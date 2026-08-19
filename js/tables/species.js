@@ -26,7 +26,7 @@
       rabbit: { energy: 8, drain: 0.4, thresh: 13, vision: 7, moveInterval: 1, litter: 1, hueMin: 38, hueRange: 22 },
       fox: { energy: 10, drain: 0.48, thresh: 14, vision: 10, moveInterval: 1, litter: 1, hueMin: 350, hueRange: 20 },
       bear: { energy: 22, drain: 0.36, thresh: 19, vision: 5, moveInterval: 1, litter: 0, hueMin: 28, hueRange: 16 },
-      koala: { energy: 12, drain: 0.28, thresh: 14, vision: 8, moveInterval: 2, litter: 1, litterOnTree: 2, hue: 145 },
+      koala: { energy: 12, drain: 0.28, thresh: 14, vision: 8, moveInterval: 2, litter: 1, litterOnTree: 1, hue: 145 },
       cow: { energy: 50, drain: 1.2, thresh: 22, vision: 6, moveInterval: 4, litter: 1, hue: 52 },
       wolf: { energy: 14, drain: 0.52, thresh: 15, vision: 12, moveInterval: 1, litter: 1, hue: 220 },
       elk: { energy: 25, drain: 0.32, thresh: 17, vision: 9, moveInterval: 1, litter: 1, hue: 185 },
@@ -50,7 +50,7 @@
       wolfSolitude: 10,
       elkPoopInterval: 5,
       koalaHideRange: 1,
-      koalaPerchCapacity: { tree: 1, bush: 0.5 },
+      koalaPerchCapacity: { tree: 1, bush: 0.5, max: 10 },
       skillBoostMul: 2
     }
   };
