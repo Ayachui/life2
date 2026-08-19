@@ -700,8 +700,39 @@
         : d.kind === LIFE_TYPES.PRED ? "rgba(200,168,106,0.12)" : "rgba(120,200,100,0.1)";
       ctx.fill();
       ctx.globalAlpha = 1;
-      drawEmoji("🦴", d.x, d.y, s, 0.7 + 0.3 * pulse, 0.85);
+      drawEmojiInCell("🦴", d.x, d.y, s, 0.7 + 0.3 * pulse, 0.85);
     }
+  }
+
+  function drawFxParticle(p, s) {
+    const span = p.krol ? 2 : 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(p.x * s, p.y * s, span * s, span * s);
+    ctx.clip();
+    ctx.globalAlpha = p.t;
+    if (p.bone) {
+      drawEmoji("🦴", p.x, p.y, s, p.t, 1.1);
+    } else if (p.krol) {
+      const cx = (p.x + 0.5) * s;
+      const cy = (p.y + 0.5) * s;
+      const pulse = 0.45 + (2.4 - p.t) * 0.55;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, s * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(224,64,251,0.18)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, s * pulse * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc((p.x + 0.5) * s, (p.y + 0.5) * s, s * 0.35 * p.t, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   function draw() {
@@ -755,7 +786,7 @@
         } else if (t === T.PLANT) {
           ctx.fillStyle = w.dish && w.inDish(x, y) ? "#0d2430" : "#08151d";
           ctx.fillRect(x * s, y * s, s, s);
-          drawEmoji(w.stageEmoji(x, y), x, y, s);
+          drawEmojiInCell(w.stageEmoji(x, y), x, y, s);
         }
       }
     }
@@ -787,31 +818,7 @@
       }
     }
 
-    for (const p of w.fx) {
-      ctx.globalAlpha = p.t;
-      if (p.bone) {
-        drawEmoji("🦴", p.x, p.y, s, p.t, 1.1);
-      } else if (p.krol) {
-        const cx = (p.x + 0.5) * s;
-        const cy = (p.y + 0.5) * s;
-        const pulse = 0.45 + (2.4 - p.t) * 0.55;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(224,64,251,0.18)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * pulse * 0.65, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc((p.x + 0.5) * s, (p.y + 0.5) * s, s * 0.35 * p.t, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
+    for (const p of w.fx) drawFxParticle(p, s);
     ctx.restore();
     updatePlagueFog();
   }
