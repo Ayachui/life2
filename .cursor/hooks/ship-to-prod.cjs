@@ -67,6 +67,12 @@ function main() {
 
   gitOk(["fetch", "origin"]);
 
+  const branch = gitOk(["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch === "HEAD") {
+    say("detached HEAD, пропуск");
+    return;
+  }
+
   const status = gitOk(["status", "--porcelain"]);
   if (status) {
     gitOk(["add", "-A"]);
@@ -92,26 +98,50 @@ function main() {
     }
   }
 
-  const rebase = git(["rebase", "origin/main"]);
-  if (rebase.status !== 0) {
-    git(["rebase", "--abort"]);
-    say("rebase на origin/main не сошёлся — прод не трогаю (нет force-push)");
+  if (branch !== "main") {
+    const co = git(["checkout", "main"]);
+    if (co.status !== 0) {
+      say(`не смог checkout main: ${co.stderr || co.stdout}`);
+      return;
+    }
+  }
+
+  const mergeOrigin = git(["merge", "--no-edit", "origin/main"]);
+  if (mergeOrigin.status !== 0) {
+    git(["merge", "--abort"]);
+    say("merge origin/main не сошёлся — прод не трогаю (нет force-push)");
     return;
+  }
+
+  if (branch !== "main") {
+    const mergeBranch = git(["merge", "--no-edit", branch]);
+    if (mergeBranch.status !== 0) {
+      git(["merge", "--abort"]);
+      say(`merge ${branch} в main не сошёлся — прод не трогаю`);
+      return;
+    }
   }
 
   const head = gitOk(["rev-parse", "HEAD"]);
-  const main = git(["rev-parse", "origin/main"]);
-  if (main.status === 0 && head === main.stdout) {
+  const remoteMain = git(["rev-parse", "origin/main"]);
+  if (remoteMain.status === 0 && head !== remoteMain.stdout) {
+    const push = git(["push", "origin", "main"]);
+    if (push.status !== 0) {
+      say(`push origin main не удался: ${push.stderr || push.stdout}`);
+      return;
+    }
+    say("запушено в origin/main (прод)");
+  } else {
     say("origin/main уже на этом коммите");
-    return;
   }
 
-  const push = git(["push", "origin", "HEAD:main"]);
-  if (push.status !== 0) {
-    say(`push в main не удался: ${push.stderr || push.stdout}`);
-    return;
+  if (branch !== "main") {
+    git(["push", "origin", "--delete", branch]);
+    git(["branch", "-D", branch]);
+    say(`ветка ${branch} удалена, остался main`);
   }
-  say("запушено в origin/main (прод)");
+
+  git(["remote", "prune", "origin"]);
 }
 
 try {

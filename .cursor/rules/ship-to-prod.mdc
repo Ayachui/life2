@@ -1,18 +1,15 @@
 ---
-description: После чата всегда коммит и push в origin/main (прод)
+description: После чата merge origin в main, коммит, push origin/main, без веток
 alwaysApply: true
 ---
 
-# Конец работы — сразу на прод
+# Конец работы — только main
 
-В этом репозитории агент **всегда** сам выкладывает изменения, где бы ни шёл чат (Cursor, облако, ветка).
+Где бы ни шёл чат:
 
-Если файлы менялись:
+1. `git fetch origin && git checkout main && git merge origin/main`
+2. Чужую ветку влей в `main` и удали (локально и на origin)
+3. Коммит без секретов
+4. `git push origin main`
 
-1. `git fetch origin` и `git rebase origin/main` (без `--force`)
-2. Коммит без `.env` / ключей / `credentials.json`
-3. `git push origin HEAD:main` — это прод (Vercel)
-
-Не заканчивай сессию на PR без попадания в `main`. Не `--force` в `main`. Не `--no-verify`.
-
-Если rebase на `origin/main` не сходится — остановись и скажи, не затирай прод старой копией.
+Не оставляй `cursor/*`. Не `--force`. Версия на диске должна совпасть с origin (**0.11.0**, пока не смените на main).
