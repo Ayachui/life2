@@ -986,8 +986,8 @@
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
     }
-    if (t === T.WATER) return "<b>Водоём</b><br>У берега трава растёт чаще. В аркаде звери идут по воде вдвое медленнее.";
-    if (t === T.WALL && w.inDish(x, y)) return "<b>Камень</b><br>Стена-забор.";
+    if (t === T.WATER) return "<b>Водоём</b><br>У берега растения растут вдвое быстрее. По воде можно идти, но вдвое медленнее.";
+    if (t === T.WALL) return "<b>Камень</b><br>Через камень никто не проходит.";
     return "<b>Пусто</b><br>Можно посадить траву или поставить зверя.";
   }
 
