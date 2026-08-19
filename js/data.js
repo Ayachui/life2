@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 7 },
+  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 8 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
