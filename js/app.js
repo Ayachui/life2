@@ -248,6 +248,13 @@
     return false;
   }
 
+  function tutorialIcon(icon) {
+    if (icon === "water") {
+      return '<canvas class="tile-icon tile-icon--water tile-icon--tut" width="44" height="44" aria-hidden="true"></canvas>';
+    }
+    return icon;
+  }
+
   function showTutorial(onDone) {
     const cards = LIFE_DATA.tutorial;
     let step = 0;
@@ -256,7 +263,7 @@
       const c = cards[step];
       $("tutorial-inner").innerHTML = `
         <div class="tut-progress">${cards.map((_, i) => `<i class="${i === step ? "on" : i < step ? "done" : ""}"></i>`).join("")}</div>
-        <div class="tut-icon">${c.icon}</div>
+        <div class="tut-icon">${tutorialIcon(c.icon)}</div>
         <h2>${c.title}</h2>
         <p>${c.text}</p>
         <label class="tut-skip"><input type="checkbox" id="tut-dont-show" /> Больше не показывать</label>
@@ -273,6 +280,7 @@
         if (step < cards.length - 1) { step++; render(); }
         else { $("tutorial").classList.add("hidden"); onDone(); }
       };
+      refreshToolIcons();
     }
 
     $("tutorial").classList.remove("hidden");
@@ -282,6 +290,22 @@
   function maybeTutorial(onDone) {
     if (localStorage.getItem(TUTORIAL_KEY)) onDone();
     else showTutorial(onDone);
+  }
+
+  function toolIconHtml(t) {
+    if (t.glyph === "water") return '<canvas class="tile-icon tile-icon--water" width="28" height="28" aria-hidden="true"></canvas>';
+    if (t.glyph === "stone") return '<canvas class="tile-icon tile-icon--stone" width="28" height="28" aria-hidden="true"></canvas>';
+    return toolEmoji(t.label);
+  }
+
+  function refreshToolIcons() {
+    if (!window.TerrainArt) return;
+    for (const canvas of document.querySelectorAll(".tile-icon--water")) {
+      TerrainArt.paintTileIcon(canvas, "water", canvas.width || 28);
+    }
+    for (const canvas of document.querySelectorAll(".tile-icon--stone")) {
+      TerrainArt.paintTileIcon(canvas, "stone", canvas.width || 28);
+    }
   }
 
   function renderTools() {
@@ -294,9 +318,10 @@
       const cantAfford = app.gameType === "arcade" && cost > 0 && app.energy < cost;
       b.className = "tool" + (app.tool === t.id ? " active" : "") + (cantAfford ? " disabled" : "");
       const costHtml = cost ? `<small>⚡${cost}</small>` : "";
+      const icon = toolIconHtml(t);
       b.innerHTML = isMobileUi()
-        ? toolEmoji(t.label) + costHtml
-        : t.label + costHtml;
+        ? icon + costHtml
+        : (t.glyph ? `${icon} ${t.label.replace(/^[^\s]+\s*/, "")}` : t.label) + costHtml;
       b.title = LIFE_DATA.toolHelp[t.id] || "";
       b.onclick = () => {
         if (cantAfford) { toast("Не хватает энергии"); return; }
@@ -305,6 +330,7 @@
       };
       grid.appendChild(b);
     }
+    refreshToolIcons();
     $("tool-help").textContent = LIFE_DATA.toolHelp[app.tool] || "";
   }
 
@@ -325,13 +351,16 @@
   }
 
   function legend() {
-    let items = [
+    const items = [
       ["🌱", "трава"], ["🌿", "куст"], ["🌳", "дерево"],
       ["🐰", "заяц"], ["🐨", "коала"], ["🐮", "корова"], ["🐇", "крол-душегуб"],
       ["🦊", "лиса"], ["🐺", "волк"], ["🦌", "лось"], ["🐻", "медведь"],
-      ["💧", "вода"], ["🪨", "камень"], ["🦴", "разложение"]
+      ['<canvas class="tile-icon tile-icon--water tile-icon--legend" width="18" height="18" aria-hidden="true"></canvas>', "водоём"],
+      ['<canvas class="tile-icon tile-icon--stone tile-icon--legend" width="18" height="18" aria-hidden="true"></canvas>', "камень"],
+      ["🦴", "разложение"]
     ];
     $("legend").innerHTML = items.map(([mark, n]) => `<span>${mark} ${n}</span>`).join("");
+    refreshToolIcons();
   }
 
   function setupWorld(gameType, difficulty) {
@@ -356,6 +385,9 @@
     const world = new World(COLS, ROWS);
     world.makeDish();
     world.arcade = gameType === "arcade";
+    if (gameType === "arcade" && window.TerrainArt) {
+      TerrainArt.scatterArcadeTerrain(world);
+    }
     app.world = world;
 
     if (gameType === "arcade" && difficulty?.id === "hardcore") {
@@ -575,6 +607,7 @@
     drawDecays(w, s);
 
     const krolMask = krolCellKeys(w);
+    const waterTime = performance.now() / 1000;
 
     for (let y = 0; y < w.h; y++) {
       for (let x = 0; x < w.w; x++) {
@@ -585,11 +618,18 @@
           if (w.dish && !w.inDish(x, y)) {
             ctx.fillStyle = "#0a1820";
             ctx.fillRect(x * s, y * s, s, s);
+          } else if (window.TerrainArt) {
+            TerrainArt.drawStoneTile(ctx, x * s, y * s, s);
           } else {
             drawEmoji("🪨", x, y, s);
           }
         } else if (t === T.WATER) {
-          drawEmoji("💧", x, y, s, 0.95);
+          if (window.TerrainArt) {
+            const mask = TerrainArt.waterNeighborMask(w, x, y);
+            TerrainArt.drawWaterTile(ctx, x * s, y * s, s, mask, waterTime);
+          } else {
+            drawEmoji("💧", x, y, s, 0.95);
+          }
         } else if (t === T.PLANT) {
           drawEmoji(w.stageEmoji(x, y), x, y, s);
         }
@@ -790,7 +830,7 @@
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
     }
-    if (t === T.WATER) return "<b>Вода</b><br>У берега трава растёт чаще.";
+    if (t === T.WATER) return "<b>Водоём</b><br>У берега трава растёт чаще. Звери через воду не проходят.";
     if (t === T.WALL && w.inDish(x, y)) return "<b>Камень</b><br>Стена-забор.";
     return "<b>Пусто</b><br>Можно посадить траву или поставить зверя.";
   }

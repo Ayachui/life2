@@ -10,8 +10,10 @@ function loadEngine() {
   vm.createContext(sandbox);
   const data = fs.readFileSync(path.join(ROOT, "js/data.js"), "utf8");
   const engine = fs.readFileSync(path.join(ROOT, "js/engine.js"), "utf8");
+  const terrain = fs.readFileSync(path.join(ROOT, "js/terrain.js"), "utf8");
   vm.runInContext(`${data}\nthis.LIFE_DATA = LIFE_DATA;`, sandbox);
   vm.runInContext(engine, sandbox);
+  vm.runInContext(terrain, sandbox);
   return sandbox;
 }
 
@@ -27,7 +29,8 @@ function createWorld(w = 24, h = 24) {
     ARCADE_STALE_AFTER: ctx.ARCADE_STALE_AFTER,
     ARCADE_LONELY_MAX: ctx.ARCADE_LONELY_MAX,
     CHAIN_SUSTAIN_GENS: ctx.CHAIN_SUSTAIN_GENS,
-    LIFE_DATA: ctx.LIFE_DATA
+    LIFE_DATA: ctx.LIFE_DATA,
+    TerrainArt: ctx.TerrainArt
   };
 }
 
