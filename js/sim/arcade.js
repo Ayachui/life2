@@ -51,7 +51,7 @@ World.prototype.checkArcadeEnd = function checkArcadeEnd(energy, herbCost) {
       return;
     }
 
-    if (this.sustainedChain) {
+    if (ARCADE_ERA_AFTER_CHAIN > 0 && this.sustainedChain) {
       if (this.chainLockGen == null) this.chainLockGen = this.generation;
       const era = this.eraProgress();
       if (era && era.left <= 0) {
@@ -120,10 +120,20 @@ World.prototype.randomPct = function randomPct(min, max) {
     return min + this.rng() * (max - min);
   };
 
+World.prototype.roulettePressure = function roulettePressure() {
+    const p = (typeof LIFE_BALANCE !== "undefined" && LIFE_BALANCE.roulette?.pressure)
+      || BAL.roulette?.pressure
+      || {};
+    const t = 1 + (this.generation || 0) * (p.perGen ?? 0);
+    return Math.min(p.cap ?? 1, Math.max(1, t));
+  };
+
 World.prototype.roulettePct = function roulettePct(type) {
     const range = ROULETTE_PCT[type];
-    if (range && range.length >= 2) return this.randomPct(range[0], range[1]);
-    return this.randomPct(0.1, 0.3);
+    const raw = range && range.length >= 2
+      ? this.randomPct(range[0], range[1])
+      : this.randomPct(0.1, 0.3);
+    return Math.min(0.85, raw * this.roulettePressure());
   };
 
 World.prototype.applyRouletteEvent = function applyRouletteEvent(type) {

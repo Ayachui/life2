@@ -623,31 +623,21 @@
     if (chainEl) {
       if (app.gameType === "arcade") {
         chainEl.classList.remove("hidden");
-        chainEl.classList.toggle("is-locked", model.chain.locked && !model.era);
-        chainEl.classList.toggle("is-era", !!model.era);
-        chainEl.classList.toggle("is-era-late", !!(model.era && model.era.late));
+        chainEl.classList.toggle("is-locked", model.chain.locked);
+        chainEl.classList.remove("is-era", "is-era-late");
         if (model.chain.locked && !app.hudPrev.chainLocked) {
           flashStat(chainEl, "is-up");
           spawnHudPop("Цепочка жива!", "score");
-          toast("Цепочка жива — копи ⚡ на правки, эра ограничена", { important: true });
+          toast("Цепочка жива — ⚡ копится, пока есть зайцы", { important: true });
         }
         app.hudPrev.chainLocked = model.chain.locked;
         const bar = $("hud-chain-bar");
-        if (bar) {
-          const ratio = model.era ? model.era.ratio : (model.chain.locked ? 1 : model.chain.ratio);
-          bar.style.width = `${Math.round(ratio * 100)}%`;
-        }
+        if (bar) bar.style.width = `${Math.round((model.chain.locked ? 1 : model.chain.ratio) * 100)}%`;
         const val = $("hud-chain-val");
-        if (val) {
-          val.textContent = model.era
-            ? `ещё ${model.era.left}`
-            : (model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`);
-        }
+        if (val) val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
         const lab = $("hud-chain-label");
-        if (lab) lab.textContent = model.era ? "Эра" : "Цепочка";
-        chainEl.title = model.era
-          ? `До записи результата ${model.era.left} циклов`
-          : "Живая цепочка";
+        if (lab) lab.textContent = "Цепочка";
+        chainEl.title = "Живая цепочка";
       } else {
         chainEl.classList.add("hidden");
       }

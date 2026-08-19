@@ -196,7 +196,8 @@ describe("энергия за эволюцию", () => {
     world.setPlant(5, 5, T.STAGE_BUSH, PLANT_CFG.bushToTree - 1);
     world.step();
     assert.equal(world.plantStageAt(5, 5), T.STAGE_TREE);
-    assert.equal(world.pendingEnergy, 0);
+    assert.equal(world.energyAudit.plantEvolveBush || 0, 0);
+    assert.equal(world.pendingEnergy, world.energyAudit.pulse || 0);
   });
 
   test("полный цикл трава → куст → дерево без пассивного ⚡", () => {
@@ -208,7 +209,9 @@ describe("энергия за эволюцию", () => {
     assert.equal(world.plantStageAt(3, 3), T.STAGE_BUSH);
     for (let i = 0; i < PLANT_CFG.bushToTree; i++) world.growPlants();
     assert.equal(world.plantStageAt(3, 3), T.STAGE_TREE);
-    assert.equal(world.pendingEnergy, 0);
+    assert.equal(world.energyAudit.plantEvolveGrass || 0, 0);
+    assert.equal(world.energyAudit.plantEvolveBush || 0, 0);
+    assert.equal(world.pendingEnergy, world.energyAudit.pulse || 0);
   });
 
   test("в песочнице эволюция не даёт ⚡", () => {

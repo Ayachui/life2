@@ -159,36 +159,74 @@ describe("аркада: устойчивость после цепочки", () 
   });
 });
 
-describe("аркада: импульс ⚡ и эра", () => {
-  test("густой лес не съедает импульс у нуля", () => {
+function tickWallet(world, gens) {
+  for (let i = 0; i < gens; i++) {
+    world.step();
+    world.playerEnergy = Math.max(0, (world.playerEnergy || 0) + world.pendingEnergy);
+    world.pendingEnergy = 0;
+  }
+}
+
+describe("аркада: импульс ⚡ без налога леса", () => {
+  test("густой лес не сжигает стартовый запас", () => {
+    const { world, T } = createWorld(16, 16);
+    world.arcade = true;
+    world.playerEnergy = 80;
+    world.arcadeBudget = 134;
+    for (let y = 1; y < 15; y++) {
+      for (let x = 1; x < 15; x++) world.setPlant(x, y, T.STAGE_GRASS, 0);
+    }
+    assert.equal(world.arcadeUpkeep(), 0);
+    tickWallet(world, 20);
+    assert.equal(world.playerEnergy, 80);
+    assert.equal(world.energyAudit.upkeep || 0, 0);
+    assert.equal(world.energyAudit.surplusDecay || 0, 0);
+    assert.equal(world.energyAudit.pulse || 0, 0);
+  });
+
+  test("остаток выше бюджета тоже не сгорает", () => {
+    const { world } = createWorld();
+    world.arcade = true;
+    world.playerEnergy = 400;
+    world.arcadeBudget = 134;
+    tickWallet(world, 25);
+    assert.equal(world.playerEnergy, 400);
+    assert.equal(world.energyAudit.surplusDecay || 0, 0);
+  });
+
+  test("при зайцах ⚡ копится даже в густом лесу", () => {
     const { world, T, LIFE_BALANCE } = createWorld(16, 16);
     world.arcade = true;
     world.playerEnergy = 0;
     world.arcadeBudget = 134;
-    world.sustainedChain = true;
+    world.set(4, 4, T.HERB);
+    world.agents = [world.makeAgent(4, 4, T.HERB)];
     for (let y = 1; y < 15; y++) {
-      for (let x = 1; x < 15; x++) world.setPlant(x, y, T.STAGE_GRASS, 0);
+      for (let x = 1; x < 15; x++) {
+        if (x === 4 && y === 4) continue;
+        world.setPlant(x, y, T.STAGE_GRASS, 0);
+      }
     }
-    assert.ok(world.arcadeUpkeep() > 0);
-    let pulsed = 0;
-    for (let i = 0; i < 6; i++) {
-      world.playerEnergy = 0;
+    let energy = 0;
+    for (let i = 0; i < 12; i++) {
+      world.playerEnergy = energy;
       world.step();
-      pulsed += world.pendingEnergy;
+      energy = Math.max(0, energy + world.pendingEnergy);
       world.pendingEnergy = 0;
     }
-    assert.ok(pulsed >= 2, `импульс ${pulsed}`);
-    assert.ok((world.energyAudit.pulse || 0) >= 2);
-    assert.ok(pulsed <= LIFE_BALANCE.arcadeEconomy.pulseCap);
+    assert.ok(energy >= 8, `накопили ${energy}`);
+    assert.ok(energy <= LIFE_BALANCE.arcadeEconomy.pulseCap);
+    assert.ok((world.energyAudit.pulse || 0) >= 8);
   });
 
   test("импульс не копится выше cap", () => {
-    const { world, LIFE_BALANCE } = createWorld();
+    const { world, T, LIFE_BALANCE } = createWorld();
     const cap = LIFE_BALANCE.arcadeEconomy.pulseCap;
     world.arcade = true;
     world.arcadeBudget = 134;
-    world.sustainedChain = true;
     world.playerEnergy = cap;
+    world.set(4, 4, T.HERB);
+    world.agents = [world.makeAgent(4, 4, T.HERB)];
     for (let i = 0; i < 8; i++) {
       world.playerEnergy = cap;
       world.step();
@@ -197,30 +235,29 @@ describe("аркада: импульс ⚡ и эра", () => {
     }
   });
 
-  test("живая чашка с 0⚡ заканчивает эру, не зрителя", () => {
-    const { world, T, LIFE_BALANCE } = createWorld();
-    const era = LIFE_BALANCE.arcadeEnd.eraAfterChain;
+  test("живая чашка не заканчивается по эре", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
     world.set(4, 4, T.HERB);
     world.agents = [world.makeAgent(4, 4, T.HERB)];
     world.setPlant(5, 5, T.STAGE_GRASS, 0);
     world.sustainedChain = true;
     world.chainLockGen = 10;
-    world.generation = 10 + era;
-    world.checkArcadeEnd(0, 45);
-    assert.equal(world.gameOver, true);
-    assert.equal(world.gameOverReason, "era_complete");
-  });
-
-  test("эра не режет старт цепочки", () => {
-    const { world, T, LIFE_BALANCE } = createWorld();
-    world.arcade = true;
-    world.set(4, 4, T.HERB);
-    world.agents = [world.makeAgent(4, 4, T.HERB)];
-    world.sustainedChain = true;
-    world.chainLockGen = 20;
-    world.generation = 20 + LIFE_BALANCE.arcadeEnd.eraAfterChain - 1;
+    world.generation = 800;
     world.checkArcadeEnd(0, 45);
     assert.equal(world.gameOver, false);
+    assert.equal(world.eraProgress(), null);
+  });
+
+  test("давление рулетки растёт со временем", () => {
+    const { world } = createWorld();
+    world.rng = () => 0;
+    world.generation = 0;
+    const early = world.roulettePct("plague");
+    world.generation = 800;
+    const late = world.roulettePct("plague");
+    assert.equal(world.roulettePressure(), 1.8);
+    assert.ok(late > early, `early ${early} late ${late}`);
+    assert.ok(late <= 0.85);
   });
 });

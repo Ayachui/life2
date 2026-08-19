@@ -106,8 +106,8 @@ function hudChain(world) {
 }
 
 function hudEra(world) {
-  const need = hudBalance().arcadeEnd?.eraAfterChain ?? 200;
-  if (!world?.sustainedChain || !need) return null;
+  const need = hudBalance().arcadeEnd?.eraAfterChain ?? 0;
+  if (!need || !world?.sustainedChain) return null;
   const lock = world.chainLockGen != null ? world.chainLockGen : (world.generation || 0);
   const used = Math.max(0, (world.generation || 0) - lock);
   const left = Math.max(0, need - used);
@@ -134,7 +134,7 @@ function hudObjective(world, meta = {}) {
     return { title: "Песочница", line: meta.note || "Собери цепочку и смотри, что будет." };
   }
   if (!meta.started) {
-    return { title: "Старт", line: "Посади траву и зайца — потом ▶ Старт." };
+    return { title: "Старт", line: "Посади траву и зайца. Необязательно тратить всё ⚡ — запас не сгорает." };
   }
   const threat = hudThreat(world, meta);
   if (threat?.kind === "no_herb") {
@@ -144,15 +144,11 @@ function hudObjective(world, meta = {}) {
   if (!chain.locked) {
     return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроются очки за время.` };
   }
-  const era = hudEra(world);
   const cap = hudBalance().arcadeEconomy?.pulseCap ?? 90;
-  if (era) {
-    return {
-      title: "Эра цепочки",
-      line: `Ещё ${era.left} циклов. ⚡ снова копится до ${cap} — правь чашку, потом запись результата.`
-    };
-  }
-  return { title: "Цепочка жива", line: "Набирай очки. ⚡ копится на правки, не ферма." };
+  return {
+    title: "Цепочка жива",
+    line: `⚡ копится до ${cap}, пока есть зайцы. Лиса в пирамиде — быстрее. Рулетка каждые 100, позже жёстче.`
+  };
 }
 
 function hudViabilityTone(label) {

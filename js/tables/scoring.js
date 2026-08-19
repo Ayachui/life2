@@ -34,7 +34,11 @@
       activity: 1,
       genBonus: 0.4,
       genCap: 5,
-      survival: 4
+      survival: 10,
+      survivalPyramid: 1.5,
+      survivalAgePer: 250,
+      survivalAgeBonus: 0.25,
+      survivalAgeCap: 2
     },
 
     /** Справка. Движок начисляет по evolutionTiers + lifePointScale. */

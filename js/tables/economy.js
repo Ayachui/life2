@@ -1,6 +1,6 @@
 /**
  * Экономика игрока: цены кисти, стартовый бюджет, ⚡.
- * Закон: живой мир платит очками, не бесконечной энергией.
+ * Закон: живой мир платит очками. Стартовый ⚡ не сгорает; импульс — пока живы зайцы.
  */
 (function (root) {
   const T = root.LIFE_TABLES || (root.LIFE_TABLES = {});
@@ -37,17 +37,13 @@
     },
 
     arcadeEconomy: {
-      maxEnergyPerGen: 6,
+      maxEnergyPerGen: 8,
       discoveryOnlyMutation: true,
-      surplusDecay: 0.04,
-      /** Импульс вмешательства: после налога леса, не выше cap. Не ферма. */
-      pulsePerGen: 0.5,
-      pulseCap: 90,
-      upkeep: {
-        freeBiomass: 48,
-        perExtra: 0.04,
-        max: 4
-      }
+      surplusDecay: 0,
+      /** ⚡ копится, пока живы зайцы, до cap. Лес кошелёк не ест. */
+      pulsePerGen: 1,
+      pyramidPulse: 0.5,
+      pulseCap: 90
     },
 
     mutationEnergy: {

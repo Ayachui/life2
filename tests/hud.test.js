@@ -46,6 +46,16 @@ describe("HUD: взгляд за секунду", () => {
     assert.equal(locked.locked, true);
   });
 
+  test("до старта цель напоминает: ⚡ не сгорает", () => {
+    const o = hudObjective({
+      herbStreak: 0,
+      sustainedChain: false,
+      arcade: true,
+      herbivoreCount: () => 0
+    }, { gameType: "arcade", started: false });
+    assert.match(o.line, /не сгорает/);
+  });
+
   test("цель аркады до цепочки — про зайцев", () => {
     const o = hudObjective({
       herbStreak: 3,
@@ -98,14 +108,12 @@ describe("HUD: взгляд за секунду", () => {
     assert.equal(withKoala.extra[0].value, 1);
   });
 
-  test("эра после цепочки — сколько циклов до записи", () => {
-    const era = hudEra({
+  test("после цепочки цель про запас ⚡, не про эру", () => {
+    assert.equal(hudEra({
       sustainedChain: true,
       chainLockGen: 40,
       generation: 80
-    });
-    assert.equal(era.left, 160);
-    assert.equal(era.used, 40);
+    }), null);
     const o = hudObjective({
       sustainedChain: true,
       chainLockGen: 40,
@@ -113,6 +121,7 @@ describe("HUD: взгляд за секунду", () => {
       arcade: true,
       herbivoreCount: () => 3
     }, { gameType: "arcade", started: true });
-    assert.match(o.line, /160/);
+    assert.match(o.line, /копится/);
+    assert.equal(o.title, "Цепочка жива");
   });
 });

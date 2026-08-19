@@ -12,7 +12,7 @@
       chainSustainGens: 25,
       noAnimalRenewalGens: 90,
       survivalPointInterval: 100,
-      eraAfterChain: 200
+      eraAfterChain: 0
     },
 
     roulette: {
@@ -24,6 +24,7 @@
         plague: [0.1, 0.3],
         evolution: [0.5, 1]
       },
+      pressure: { perGen: 0.0015, cap: 1.8 },
       plagueFogTicks: 45,
       screenShake: 28
     }

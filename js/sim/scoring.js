@@ -110,8 +110,17 @@ World.prototype.tickSurvivalPoints = function tickSurvivalPoints() {
     if (this.generation <= 0 || this.generation % SURVIVAL_POINT_INTERVAL !== 0) return;
     const mul = this.ecosystemRewardMul();
     if (mul <= 0) return;
-    const base = this.pointScale().survival ?? 4;
-    this.awardLifePoints(Math.max(1, Math.round(base * mul)));
+    const sc = this.pointScale();
+    let pts = (sc.survival ?? 4) * mul;
+    if (this.predatorCount() > 0 && this.counts().plants > 0) {
+      pts *= (sc.survivalPyramid ?? 1);
+    }
+    const agePer = sc.survivalAgePer ?? 0;
+    if (agePer > 0) {
+      const steps = Math.floor((this.generation || 0) / agePer);
+      pts *= 1 + Math.min(sc.survivalAgeCap ?? 0, steps * (sc.survivalAgeBonus ?? 0));
+    }
+    this.awardLifePoints(Math.max(1, Math.round(pts)));
   };
 
 World.prototype.ecosystemRewardMul = function ecosystemRewardMul() {
