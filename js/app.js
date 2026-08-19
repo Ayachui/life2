@@ -300,7 +300,7 @@
   }
 
   function showRulesIntro(gameType, difficulty, onDone, { persistSkip = true } = {}) {
-    $("modal-card").innerHTML = buildRulesHtml(gameType, difficulty);
+    $("modal-card").innerHTML = buildRulesHtml(gameType, difficulty, persistSkip);
     $("modal-card").classList.add("rules-info-card", "wide");
     $("modal").classList.remove("hidden");
     refreshToolIcons();
