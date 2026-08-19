@@ -685,10 +685,9 @@ describe("аркада: вода, камень и стирание", () => {
     assert.equal(world.get(5, 5), T.PLANT);
   });
 
-  test("вода в чашке не блокирует зверей", () => {
+  test("вода проходима и замедляет в песочнице", () => {
     const { world, T } = createWorld();
-    world.arcade = true;
-    world.makeDish();
+    world.arcade = false;
     world.set(8, 8, T.WATER);
     world.set(8, 9, T.HERB);
     const herb = world.makeAgent(8, 9, T.HERB);
@@ -696,18 +695,9 @@ describe("аркада: вода, камень и стирание", () => {
     assert.ok(world.moveTowardTarget(herb, 8, 8));
     assert.equal(herb.x, 8);
     assert.equal(herb.y, 8);
-  });
-
-  test("в песочнице вода по-прежнему блокирует", () => {
-    const { world, T } = createWorld();
-    world.arcade = false;
-    world.set(8, 8, T.WATER);
-    world.set(8, 9, T.HERB);
-    const herb = world.makeAgent(8, 9, T.HERB);
-    world.agents = [herb];
-    assert.equal(world.moveTowardTarget(herb, 8, 8), false);
-    assert.equal(herb.x, 8);
-    assert.equal(herb.y, 9);
+    herb.moveInterval = 1;
+    assert.ok(world.agentOnWater(herb));
+    assert.equal(world.moveIntervalFor(herb), 2);
   });
 
   test("вода в аркаде замедляет движение вдвое", () => {
@@ -739,6 +729,34 @@ describe("аркада: вода, камень и стирание", () => {
       if (world.canMoveThisTick(herb)) landTicks++;
     }
     assert.equal(landTicks, 8);
+  });
+
+  test("камень непроходим в аркаде", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.makeDish();
+    world.set(8, 8, T.WALL);
+    world.set(8, 9, T.HERB);
+    const herb = world.makeAgent(8, 9, T.HERB);
+    world.agents = [herb];
+    assert.equal(world.moveTowardTarget(herb, 8, 8), false);
+    assert.equal(herb.x, 8);
+    assert.equal(herb.y, 9);
+  });
+
+  test("вода у берега ускоряет рост растений вдвое", () => {
+    const { world, T } = createWorld();
+    world.set(4, 4, T.WATER);
+    world.setPlant(5, 4, T.STAGE_GRASS, 0);
+    world.setPlant(5, 8, T.STAGE_GRASS, 0);
+    const wetIdx = world.idx(5, 4);
+    const dryIdx = world.idx(5, 8);
+    const wetBefore = world.plantAge[wetIdx];
+    const dryBefore = world.plantAge[dryIdx];
+    world.growPlants();
+    const wetGain = world.plantAge[wetIdx] - wetBefore;
+    const dryGain = world.plantAge[dryIdx] - dryBefore;
+    assert.equal(wetGain, dryGain * 2);
   });
 });
 
@@ -911,8 +929,9 @@ describe("террейн и рулетка", () => {
     assert.ok(world.canAgentMoveTo(elk, cx, cy));
     world.moveAgentTo(elk, cx, cy);
     assert.equal(world.get(cx, cy), T.WATER);
-    assert.ok(world.canAgentMoveTo(elk, cx + 1, cy));
-    world.moveAgentTo(elk, cx + 1, cy);
+    assert.equal(world.canAgentMoveTo(elk, cx + 1, cy), false);
+    assert.equal(elk.x, cx);
+    assert.equal(elk.y, cy);
     assert.equal(world.get(cx + 1, cy), T.WALL);
   });
 
@@ -1137,5 +1156,68 @@ describe("коала", () => {
     const rabbitPts = world.lifePoints;
     world.awardBirthPoints(koala);
     assert.ok(world.lifePoints > rabbitPts, "коала должна давать больше очков, чем заяц");
+  });
+});
+
+describe("грибы", () => {
+  test("корова сажает гриб на соседнюю пустую клетку", () => {
+    const { world, T } = createWorld();
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        world.set(5 + dx, 5 + dy, T.EMPTY);
+      }
+    }
+    assert.ok(world.tryPlantMushroomNear(5, 5));
+    let mushrooms = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        if (world.get(5 + dx, 5 + dy) === T.MUSHROOM) mushrooms++;
+      }
+    }
+    assert.equal(mushrooms, 1, "гриб должен появиться рядом с коровой");
+  });
+
+  test("съеденный гриб удваивает зрение и скорость хода", () => {
+    const { world, T, MUSHROOM_CFG } = createWorld();
+    const herb = world.makeAgent(5, 5, T.HERB);
+    herb.vision = 6;
+    herb.moveInterval = 4;
+    herb.energy = 1;
+    herb.thresh = 99;
+    world.agents = [herb];
+    world.set(6, 5, T.MUSHROOM);
+    assert.equal(world.effectiveVision(herb), 6);
+    assert.equal(world.moveIntervalFor(herb), 4);
+    world.feedHungryHerb(herb);
+    assert.equal(world.get(6, 5), T.EMPTY);
+    assert.equal(herb.skillBoost, true);
+    assert.equal(world.effectiveVision(herb), 12);
+    assert.equal(world.moveIntervalFor(herb), 2);
+    assert.ok(herb.energy >= MUSHROOM_CFG.energy);
+  });
+
+  test("гриб не продлевает жизнь крол-душегуба", () => {
+    const { world, T, KROL_LIFESPAN } = createWorld();
+    const krol = placeKrol(world, 5, 5, T);
+    krol.bornGen = 0;
+    world.generation = KROL_LIFESPAN - 1;
+    world.agents = [krol];
+    world.set(6, 5, T.MUSHROOM);
+    world.krolDevourCells(krol, [{ x: 6, y: 5 }]);
+    assert.equal(krol.skillBoost, true);
+    assert.equal(krol.bornGen, 0);
+    world.generation = KROL_LIFESPAN;
+    world.stepAgents();
+    assert.ok(krol.dead, "крол должен умереть по сроку жизни несмотря на гриб");
+  });
+
+  test("потомок не наследует бонус гриба", () => {
+    const { world, T } = createWorld();
+    const parent = world.makeAgent(5, 5, T.HERB);
+    parent.skillBoost = true;
+    const baby = world.makeAgent(6, 5, T.HERB, parent);
+    assert.equal(baby.skillBoost, false);
   });
 });
