@@ -819,6 +819,8 @@
     ctx.restore();
     updatePlagueFog();
   }
+
+  function drawSpanEmoji(emoji, x, y, span, s, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
     const cx = (x + span / 2) * s;
