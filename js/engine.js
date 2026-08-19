@@ -62,6 +62,9 @@ const SPECIES_CFG = {
 const NO_ANIMAL_RENEWAL_GENS = 90;
 const ARCADE_STALE_AFTER = 40;
 const ARCADE_LONELY_MAX = 120;
+const ARCADE_NO_HERB_MAX = 60;
+const ARCADE_PRED_ONLY_MAX = 35;
+const SURVIVAL_POINT_INTERVAL = 100;
 const CHAIN_SUSTAIN_GENS = 25;
 
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
@@ -234,19 +237,25 @@ class World {
     this.lifePoints += amount;
   }
 
+  awardScaledEcoPoints(amount) {
+    const mul = this.ecosystemRewardMul();
+    if (!mul || !amount) return;
+    this.awardLifePoints(Math.max(1, Math.round(amount * mul)));
+  }
+
   awardBirthPoints(agent) {
-    this.awardLifePoints(this.tierPoints("birth", this.agentTier(agent), agent?.gen));
+    this.awardScaledEcoPoints(this.tierPoints("birth", this.agentTier(agent), agent?.gen));
   }
 
   awardDeathPoints(agent) {
-    this.awardLifePoints(this.tierPoints("death", this.agentTier(agent), agent?.gen));
+    this.awardScaledEcoPoints(this.tierPoints("death", this.agentTier(agent), agent?.gen));
   }
 
   awardMutationPoints(agent) {
     const tier = this.agentTier(agent);
     const sc = this.pointScale();
     const bonus = sc.mutation ?? 6;
-    this.awardLifePoints(Math.max(1, Math.round(bonus * tier * this.genPointMul(agent?.gen))));
+    this.awardScaledEcoPoints(Math.max(1, Math.round(bonus * tier * this.genPointMul(agent?.gen))));
   }
 
   awardProcessedEnergy(energy, eater = null, foodTier = 1) {
@@ -254,7 +263,7 @@ class World {
     const eaterTier = eater ? this.agentTier(eater) : 1;
     const weight = 0.35 + eaterTier * 0.3 + foodTier * 0.35;
     const points = Math.max(1, Math.round(energy * weight * this.genPointMul(eater?.gen)));
-    this.awardLifePoints(points);
+    this.awardScaledEcoPoints(points);
   }
 
   idx(x, y) { return y * this.w + x; }
@@ -588,9 +597,29 @@ class World {
     return this.live(HERB).length;
   }
 
-  /** Пассивные награды от растений — только при живых травоядных. */
+  predatorCount() {
+    let n = this.live(PRED).length;
+    for (const a of this.agents) {
+      if (!a.dead && a.kind === BEAR) n++;
+    }
+    return n;
+  }
+
+  /** Пассивные награды: 0 без травоядных; частичный штраф при перевесе хищников. */
   ecosystemRewardMul() {
-    return this.herbivoreCount() > 0 ? 1 : 0;
+    const herbs = this.herbivoreCount();
+    if (herbs <= 0) return 0;
+    const preds = this.predatorCount();
+    const total = herbs + preds;
+    if (preds <= 0 || total <= 0) return 1;
+    const ratio = herbs / total;
+    if (ratio >= 0.4) return 1;
+    return Math.max(0.12, Math.min(1, ratio * 2.5));
+  }
+
+  noHerbEndLimit() {
+    if (this.predatorCount() > 0) return ARCADE_PRED_ONLY_MAX;
+    return ARCADE_NO_HERB_MAX;
   }
 
   plantRenewalMul() {
@@ -599,21 +628,36 @@ class World {
   }
 
   awardPlantLifePoints(eventKey) {
-    if (!this.ecosystemRewardMul()) return;
+    const mul = this.ecosystemRewardMul();
+    if (!mul) return;
     const tier = this.plantEventTier(eventKey);
-    this.awardLifePoints(this.tierPoints("plant", tier));
+    this.awardScaledEcoPoints(this.tierPoints("plant", tier));
   }
 
   grantPlantArcadeEnergy(key) {
-    if (!this.ecosystemRewardMul()) return 0;
-    return this.grantArcadeEnergy(key);
+    const mul = this.ecosystemRewardMul();
+    if (!mul || !this.arcade || !key) return 0;
+    const raw = this.arcadeEnergyTable()[key] ?? 0;
+    if (raw <= 0) return 0;
+    const gain = mul >= 1 ? raw : Math.floor(raw * mul);
+    if (gain > 0) this.pendingEnergy += gain;
+    return gain;
+  }
+
+  tickSurvivalPoints() {
+    if (!this.arcade || !this.sustainedChain) return;
+    if (this.generation <= 0 || this.generation % SURVIVAL_POINT_INTERVAL !== 0) return;
+    const mul = this.ecosystemRewardMul();
+    if (mul <= 0) return;
+    const base = this.pointScale().survival ?? 4;
+    this.awardLifePoints(Math.max(1, Math.round(base * mul)));
   }
 
   checkArcadeEnd(energy, herbCost) {
     if (!this.arcade || this.gameOver) return;
     const broke = energy < herbCost;
 
-    if (this.noHerbGens >= ARCADE_LONELY_MAX) {
+    if (this.noHerbGens >= this.noHerbEndLimit()) {
       this.gameOver = true;
       this.gameOverReason = "no_chain";
       return;
@@ -1597,6 +1641,7 @@ class World {
     this.growPlants();
     this.stepAgents();
     this.generation++;
+    this.tickSurvivalPoints();
     if (this.arcade && !this.isAlive() && !this.sustainedChain) this.gameOver = true;
   }
 
@@ -1623,7 +1668,7 @@ class World {
     });
     this.fx.push({ x, y, color: "#8b6914", t: 1.4, fert: true });
     this.chime("fertilize");
-    this.awardLifePoints(this.tierPoints("activity", this.plantEventTier("fertilize")));
+    this.awardScaledEcoPoints(this.tierPoints("activity", this.plantEventTier("fertilize")));
     this.grantArcadeEnergy("fertilize");
   }
 
@@ -1947,4 +1992,7 @@ window.SPECIES_CFG = SPECIES_CFG;
 window.MUT_CHANCE = MUT_CHANCE;
 window.ARCADE_STALE_AFTER = ARCADE_STALE_AFTER;
 window.ARCADE_LONELY_MAX = ARCADE_LONELY_MAX;
+window.ARCADE_NO_HERB_MAX = ARCADE_NO_HERB_MAX;
+window.ARCADE_PRED_ONLY_MAX = ARCADE_PRED_ONLY_MAX;
+window.SURVIVAL_POINT_INTERVAL = SURVIVAL_POINT_INTERVAL;
 window.CHAIN_SUSTAIN_GENS = CHAIN_SUSTAIN_GENS;

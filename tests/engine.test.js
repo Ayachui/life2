@@ -622,6 +622,31 @@ describe("лес без зверей", () => {
     assert.equal(world.ecosystemRewardMul(), 0);
   });
 
+  test("перевес хищников снижает награды", () => {
+    const { world, T } = createWorld();
+    world.set(0, 0, T.HERB);
+    world.agents = [world.makeAgent(0, 0, T.HERB)];
+    for (let i = 0; i < 4; i++) {
+      world.set(i + 1, 0, T.PRED);
+      world.agents.push(world.makeAgent(i + 1, 0, T.PRED));
+    }
+    const mul = world.ecosystemRewardMul();
+    assert.ok(mul > 0 && mul < 1, `ожидали частичный штраф, получили ${mul}`);
+  });
+
+  test("очки за выживание только при устойчивой цепочке", () => {
+    const { world, T, SURVIVAL_POINT_INTERVAL } = createWorld();
+    world.arcade = true;
+    world.generation = SURVIVAL_POINT_INTERVAL;
+    world.set(1, 1, T.HERB);
+    world.agents = [world.makeAgent(1, 1, T.HERB)];
+    world.tickSurvivalPoints();
+    assert.equal(world.lifePoints, 0);
+    world.sustainedChain = true;
+    world.tickSurvivalPoints();
+    assert.ok(world.lifePoints > 0);
+  });
+
   test("растения не дают энергию без травоядных", () => {
     const { world, T, PLANT_CFG } = createWorld();
     world.arcade = true;
@@ -733,44 +758,48 @@ describe("очки жизни", () => {
   test("охота даёт больше очков у эволюционировавших хищников", () => {
     const { world, T } = createWorld();
     world.arcade = true;
-    const prey = world.makeAgent(3, 3, T.HERB);
-    world.set(3, 3, T.HERB);
-    const fox = world.makeAgent(4, 4, T.PRED);
-    world.set(4, 4, T.PRED);
-    const wolf = world.makeAgent(5, 5, T.PRED);
-    wolf.trait = "волк";
-    world.set(5, 5, T.PRED);
-    world.agents = [prey, fox, wolf];
 
-    world.killAgent(prey, fox, 7.2);
-    const foxPoints = world.lifePoints;
+    function huntAs(killer, preyX, preyY) {
+      const w = createWorld().world;
+      w.arcade = true;
+      w.set(preyX, preyY, T.HERB);
+      const prey = w.makeAgent(preyX, preyY, T.HERB);
+      w.set(preyX + 1, preyY, T.HERB);
+      const grazer = w.makeAgent(preyX + 1, preyY, T.HERB);
+      w.set(preyX, preyY + 1, T.PRED);
+      const hunter = w.makeAgent(preyX, preyY + 1, T.PRED);
+      hunter.trait = killer.trait;
+      w.agents = [prey, grazer, hunter];
+      w.killAgent(prey, hunter, 7.2);
+      return w.lifePoints;
+    }
 
-    const prey2 = world.makeAgent(6, 6, T.HERB);
-    world.set(6, 6, T.HERB);
-    world.agents.push(prey2);
-    world.killAgent(prey2, wolf, 7.2);
-    const wolfGain = world.lifePoints - foxPoints;
-    assert.ok(wolfGain > 0);
-    assert.ok(wolfGain > foxPoints, "волк (тир 4) должен давать больше, чем лиса (тир 2)");
+    const foxPoints = huntAs({ trait: null }, 3, 3);
+    const wolfPoints = huntAs({ trait: "волк" }, 8, 3);
+    assert.ok(wolfPoints > foxPoints, `волк ${wolfPoints} vs лиса ${foxPoints}`);
   });
 
   test("мутация и поколение усиливают очки", () => {
     const { world, T } = createWorld();
     world.arcade = true;
-    const parent = world.makeAgent(3, 3, T.HERB);
-    parent.gen = 3;
-    const baby = world.makeAgent(4, 3, T.HERB, parent);
-    baby.trait = "коала";
-    world.applySpeciesTrait(baby, "коала", 4, 3, parent);
-    const withGen = world.lifePoints;
 
-    world.lifePoints = 0;
-    const fresh = world.makeAgent(5, 5, T.HERB);
-    fresh.gen = 1;
-    const baby2 = world.makeAgent(6, 5, T.HERB, fresh);
-    baby2.trait = "коала";
-    world.applySpeciesTrait(baby2, "коала", 6, 5, fresh);
-    assert.ok(withGen > world.lifePoints);
+    function mutateKoala(parentGen) {
+      const w = createWorld().world;
+      w.arcade = true;
+      w.set(3, 3, T.HERB);
+      const parent = w.makeAgent(3, 3, T.HERB);
+      parent.gen = parentGen;
+      w.set(4, 3, T.HERB);
+      const grazer = w.makeAgent(4, 3, T.HERB);
+      const baby = w.makeAgent(5, 3, T.HERB, parent);
+      w.agents = [parent, grazer, baby];
+      w.applySpeciesTrait(baby, "коала", 5, 3, parent);
+      return w.lifePoints;
+    }
+
+    const withGen = mutateKoala(3);
+    const fresh = mutateKoala(1);
+    assert.ok(withGen > fresh, `поколение 4 vs 2: ${withGen} > ${fresh}`);
   });
 });
 

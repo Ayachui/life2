@@ -1,7 +1,7 @@
 (() => {
   const COLS = 48;
   const ROWS = 48;
-  const TUTORIAL_KEY = "life-tutorial-seen-v3";
+  const RULES_KEY = "life-rules-seen-v1";
 
   const $ = (id) => document.getElementById(id);
   const app = {
@@ -141,6 +141,7 @@
     $("modal").classList.add("hidden");
     $("modal-card").classList.remove("wide");
     $("modal-card").classList.remove("krol-alert");
+    $("modal-card").classList.remove("rules-info-card");
     if (app.resumeGameOverAfterModal && app.gameEnded && app.gameType === "arcade" && app.world) {
       app.resumeGameOverAfterModal = false;
       const title = app.world.gameOverReason === "no_chain"
@@ -249,48 +250,73 @@
     return false;
   }
 
-  function tutorialIcon(icon) {
-    if (icon === "water") {
-      return '<canvas class="tile-icon tile-icon--water tile-icon--tut" width="44" height="44" aria-hidden="true"></canvas>';
-    }
-    return icon;
+  function rulesFlowHtml() {
+    const flow = LIFE_DATA.rulesInfographic?.flow || [];
+    return flow.map((step, i) => {
+      const arrow = i > 0 ? '<span class="rules-arrow" aria-hidden="true">→</span>' : "";
+      const icon = step.icon === "water"
+        ? '<canvas class="tile-icon tile-icon--water tile-icon--rules" width="32" height="32" aria-hidden="true"></canvas>'
+        : step.icon;
+      return `${arrow}<div class="rules-step">${icon}<small>${step.label}</small></div>`;
+    }).join("");
   }
 
-  function showTutorial(onDone) {
-    const cards = LIFE_DATA.tutorial;
-    let step = 0;
+  function rulesCardsHtml(gameType) {
+    const cards = LIFE_DATA.rulesInfographic?.cards || [];
+    return cards.map((card) => `
+      <article class="rules-card">
+        <h4><span class="rules-card-ico">${card.icon}</span> ${card.title}</h4>
+        <ul>${card.items.map((item) => `<li>${item}</li>`).join("")}</ul>
+      </article>
+    `).join("") + (gameType === "sandbox"
+      ? `<article class="rules-card rules-card--accent"><h4><span class="rules-card-ico">🏖</span> Песочница</h4><p>${LIFE_DATA.rulesInfographic.sandboxNote}</p></article>`
+      : "");
+  }
 
-    function render() {
-      const c = cards[step];
-      $("tutorial-inner").innerHTML = `
-        <div class="tut-progress">${cards.map((_, i) => `<i class="${i === step ? "on" : i < step ? "done" : ""}"></i>`).join("")}</div>
-        <div class="tut-icon">${tutorialIcon(c.icon)}</div>
-        <h2>${c.title}</h2>
-        <p>${c.text}</p>
-        <label class="tut-skip"><input type="checkbox" id="tut-dont-show" /> Больше не показывать</label>
+  function buildRulesHtml(gameType, difficulty, showSkip = true) {
+    const isArcade = gameType === "arcade";
+    const modeLabel = isArcade
+      ? `Аркада · ${difficulty?.label || ""}${difficulty ? ` · ⚡${difficulty.energy}` : ""}`
+      : "Песочница · свободный режим";
+    const skipHtml = showSkip
+      ? '<label class="rules-skip"><input type="checkbox" id="rules-dont-show" /> Больше не показывать при старте</label>'
+      : "";
+    const btnLabel = showSkip ? "Понятно, начать!" : "Понятно";
+    return `
+      <div class="rules-info">
+        <header class="rules-info-header">
+          <span class="rules-mode-tag">${modeLabel}</span>
+          <h3>Правила мира</h3>
+          <p class="rules-lead">Цепочка эволюции, очки, энергия и условия конца раунда — на одной схеме.</p>
+        </header>
+        <div class="rules-flow" aria-label="Цепочка эволюции">${rulesFlowHtml()}</div>
+        <div class="rules-grid">${rulesCardsHtml(gameType)}</div>
+        ${skipHtml}
         <div class="modal-actions">
-          ${step > 0 ? '<button class="btn" id="tut-prev">Назад</button>' : ""}
-          <button class="btn primary" id="tut-next">${step < cards.length - 1 ? "Далее" : "Понятно, начать!"}</button>
+          <button class="btn primary" type="button" id="rules-start">${btnLabel}</button>
         </div>
-      `;
-      const prev = $("tut-prev");
-      if (prev) prev.onclick = () => { step--; LifeSound.play("tutorial"); render(); };
-      $("tut-next").onclick = () => {
-        if ($("tut-dont-show")?.checked) localStorage.setItem(TUTORIAL_KEY, "1");
-        LifeSound.play("tutorial");
-        if (step < cards.length - 1) { step++; render(); }
-        else { $("tutorial").classList.add("hidden"); onDone(); }
-      };
-      refreshToolIcons();
-    }
-
-    $("tutorial").classList.remove("hidden");
-    render();
+      </div>
+    `;
   }
 
-  function maybeTutorial(onDone) {
-    if (localStorage.getItem(TUTORIAL_KEY)) onDone();
-    else showTutorial(onDone);
+  function showRulesIntro(gameType, difficulty, onDone, { persistSkip = true } = {}) {
+    $("modal-card").innerHTML = buildRulesHtml(gameType, difficulty);
+    $("modal-card").classList.add("rules-info-card", "wide");
+    $("modal").classList.remove("hidden");
+    refreshToolIcons();
+    $("rules-start").onclick = () => {
+      if (persistSkip && $("rules-dont-show")?.checked) {
+        localStorage.setItem(RULES_KEY, "1");
+      }
+      LifeSound.play("tutorial");
+      closeModal();
+      onDone();
+    };
+  }
+
+  function maybeRulesIntro(gameType, difficulty, onDone) {
+    if (localStorage.getItem(RULES_KEY)) onDone();
+    else showRulesIntro(gameType, difficulty, onDone);
   }
 
   function toolIconHtml(t) {
@@ -411,10 +437,10 @@
       $("game-title").textContent = "Аркада";
       $("game-subtitle").textContent = difficulty.label;
       $("hud-goal-title").textContent = "Цель";
-      $("hud-goal").textContent = `Набирай очки жизни: рождения, эволюции, охота и смерти. Энергия на старт: ${difficulty.energy} ⚡`;
+      $("hud-goal").textContent = `Набирай очки за живую цепочку: эволюция, мутации, охота. Энергия: ${difficulty.energy} ⚡`;
       $("hud-hint").textContent = difficulty.id === "hardcore"
-        ? "На старте в центре уже растёт трава. Держи стаю зайцев живой 25 ходов подряд — за деревья и особых зверей дают энергию."
-        : "Держи стаю зайцев живой 25 ходов подряд. За деревья и особых зверей дают энергию.";
+        ? "В центре уже трава. Держи травоядных 25+ циклов — тогда идут очки за время."
+        : "Без травоядных награды падают. Только хищники + лес — раунд кончится быстро.";
     } else {
       $("game-title").textContent = "Песочница";
       $("game-subtitle").textContent = "Свободный опыт";
@@ -433,14 +459,14 @@
   }
 
   function startArcade(diff) {
-    maybeTutorial(() => {
+    maybeRulesIntro("arcade", diff, () => {
       showScreen("screen-game");
       setupWorld("arcade", diff);
     });
   }
 
   function startSandbox() {
-    maybeTutorial(() => {
+    maybeRulesIntro("sandbox", null, () => {
       showScreen("screen-game");
       setupWorld("sandbox", null);
     });
@@ -1076,12 +1102,7 @@
   $("btn-sound-menu").onclick = toggleSound;
   $("btn-music-menu").onclick = toggleMusic;
   $("btn-help").onclick = () => {
-    const h = LIFE_DATA.help[app.gameType] || LIFE_DATA.help.sandbox;
-    openModal(`
-      <h3>${h.title}</h3>
-      <ul class="help-list">${h.body.map((p) => `<li>${p}</li>`).join("")}</ul>
-      <div class="modal-actions"><button class="btn primary" type="button" id="help-ok">Понятно</button></div>
-    `);
+    showRulesIntro(app.gameType || "sandbox", app.difficulty, () => {}, { persistSkip: false });
   };
   $("go-menu").onclick = () => { hideGameOverOverlay(); showScreen("screen-menu"); };
   $("go-retry").onclick = () => { hideGameOverOverlay(); startArcade(app.difficulty); };
@@ -1104,7 +1125,7 @@
   $("krol-ok").onclick = () => dismissKrolOverlay(true);
   $("modal").addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
-    if (e.target.id === "lb-close" || e.target.id === "help-ok") closeModal();
+    if (e.target.id === "lb-close") closeModal();
   });
   window.addEventListener("keydown", (e) => {
     if (e.code === "Escape" && isModalOpen()) {
