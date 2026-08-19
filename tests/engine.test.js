@@ -709,6 +709,37 @@ describe("аркада: вода, камень и стирание", () => {
     assert.equal(herb.x, 8);
     assert.equal(herb.y, 9);
   });
+
+  test("вода в аркаде замедляет движение вдвое", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.makeDish();
+    world.set(5, 5, T.WATER);
+    const herb = world.makeAgent(5, 5, T.HERB);
+    herb.moveInterval = 1;
+    world.agents = [herb];
+    assert.ok(world.agentOnWater(herb));
+    assert.equal(world.moveIntervalFor(herb), 2);
+
+    let waterTicks = 0;
+    for (let phase = 1; phase <= 8; phase++) {
+      herb.movePhase = phase;
+      if (world.canMoveThisTick(herb)) waterTicks++;
+    }
+    assert.equal(waterTicks, 4);
+
+    world.set(5, 5, T.EMPTY);
+    world.set(5, 5, T.HERB);
+    herb.x = 5;
+    herb.y = 5;
+    assert.equal(world.agentOnWater(herb), false);
+    let landTicks = 0;
+    for (let phase = 1; phase <= 8; phase++) {
+      herb.movePhase = phase;
+      if (world.canMoveThisTick(herb)) landTicks++;
+    }
+    assert.equal(landTicks, 8);
+  });
 });
 
 describe("квадратная чашка", () => {
