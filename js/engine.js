@@ -82,6 +82,7 @@ const BREED_MIN_AGE = {
 
 /** Стартовый кулдаун для посаженных зверей (дополнительно к возрасту). */
 const BREED_COOL_INIT = { herb: 10, pred: 14 };
+const WATER_SLOW_MUL = 2;
 
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
 
@@ -988,7 +989,26 @@ class World {
     if (isElk(a)) a.stepsSincePoop = (a.stepsSincePoop || 0) + 1;
   }
 
+  agentOnWater(a) {
+    if (!this.arcade || !a) return false;
+    for (const c of agentFootprint(a)) {
+      if (this.get(c.x, c.y) === WATER) return true;
+    }
+    return false;
+  }
+
+  moveIntervalFor(a) {
+    let interval = a.moveInterval || 1;
+    if (this.agentOnWater(a)) interval *= WATER_SLOW_MUL;
+    return interval;
+  }
+
+  canMoveThisTick(a) {
+    return (a.movePhase || 0) % this.moveIntervalFor(a) === 0;
+  }
+
   wanderAgent(a) {
+    if (!this.canMoveThisTick(a)) return false;
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (let i = dirs.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -1006,6 +1026,7 @@ class World {
   }
 
   fleeFrom(a, tx, ty) {
+    if (!this.canMoveThisTick(a)) return false;
     const step = this.stepAway(a.x, a.y, tx, ty);
     if (step && this.canAgentMoveTo(a, step.x, step.y)) {
       this.moveAgentTo(a, step.x, step.y);
@@ -1015,6 +1036,7 @@ class World {
   }
 
   moveTowardTarget(a, tx, ty) {
+    if (!this.canMoveThisTick(a)) return false;
     const steps = [];
     const primary = this.stepToward(a.x, a.y, tx, ty);
     if (primary) steps.push(primary);
@@ -1042,9 +1064,7 @@ class World {
   }
 
   shouldMoveThisTick(a) {
-    const interval = a.moveInterval || 1;
-    a.movePhase = (a.movePhase || 0) + 1;
-    return a.movePhase % interval === 0;
+    return this.canMoveThisTick(a);
   }
 
   stepSated(a) {
@@ -2063,6 +2083,7 @@ class World {
     for (const a of order) {
       if (a.dead) continue;
 
+      a.movePhase = (a.movePhase || 0) + 1;
       const wasSated = a.energy >= a.thresh;
 
       if (isKrolDushegub(a) && a.bornGen != null && this.generation - a.bornGen >= KROL_LIFESPAN) {

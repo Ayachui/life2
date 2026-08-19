@@ -215,7 +215,7 @@
     const wheel = $("roulette-wheel");
     wheel.classList.remove("spinning");
     wheel.style.transition = "none";
-    wheel.style.transform = "rotate(0deg)";
+    wheel.style.removeProperty("transform");
     void wheel.offsetWidth;
     wheel.style.transition = "";
   }
@@ -252,7 +252,9 @@
       : 2160;
     resetRouletteWheel();
     wheel.style.setProperty("--spin-deg", `${spinDeg}deg`);
-    wheel.classList.add("spinning");
+    requestAnimationFrame(() => {
+      wheel.classList.add("spinning");
+    });
     LifeSound.play("ui");
     setTimeout(() => {
       wheel.classList.remove("spinning");
@@ -984,7 +986,7 @@
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
     }
-    if (t === T.WATER) return "<b>Водоём</b><br>У берега трава растёт чаще. Звери через воду не проходят.";
+    if (t === T.WATER) return "<b>Водоём</b><br>У берега трава растёт чаще. В аркаде звери идут по воде вдвое медленнее.";
     if (t === T.WALL && w.inDish(x, y)) return "<b>Камень</b><br>Стена-забор.";
     return "<b>Пусто</b><br>Можно посадить траву или поставить зверя.";
   }
