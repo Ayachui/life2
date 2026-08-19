@@ -8,7 +8,9 @@ const PLANT_CFG = {
   grassToBush: 10,
   bushToTree: 28,
   treeLife: 113,
-  bushSpread: 0.055,
+  bushSpread: 0.037,
+  bushFoodWeight: 0.4,
+  bushViabilityWeight: 0.33,
   grassBites: 2,
   bushBites: 4,
   grassEnergy: 3.5,
@@ -1448,7 +1450,7 @@ class World {
     const c = this.counts();
     const herbSat = this.satietyOf(HERB);
     const predSat = this.satietyOf(PRED);
-    const edible = c.grass + c.bush * 0.5;
+    const edible = c.grass + c.bush * PLANT_CFG.bushViabilityWeight;
     const foodPerHerb = c.herbs ? edible / c.herbs : edible ? Infinity : 0;
     const preyPerFox = c.preds ? c.herbs / c.preds : 0;
     let score = 0;
@@ -1809,7 +1811,7 @@ class World {
       if (a.kind !== BEAR && !isElk(a) && !isKrolDushegub(a) && a.energy >= a.thresh && a.cool <= 0) {
         let breedChance = 1;
         if (a.kind === HERB && c.herbs > 0) {
-          const edible = c.grass + c.bush * 0.6;
+          const edible = c.grass + c.bush * PLANT_CFG.bushFoodWeight;
           if (c.herbs > edible * 0.85) breedChance = 0.25;
           else if (c.herbs > edible * 0.55) breedChance = 0.55;
         }

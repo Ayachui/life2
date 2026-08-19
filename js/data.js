@@ -2,7 +2,7 @@ const LIFE_DATA = {
   // Версия в меню: Альфа/Бета 0.M.P (до релиза 1.0.0).
   // patch +0.0.1 — тексты, мелкий баланс, багфиксы
   // minor +0.1.0 — механика, зверь, режим, крупный ребаланс
-  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 4 },
+  gameVersion: { stage: "alpha", major: 0, minor: 8, patch: 6 },
   tools: [
     { id: "plant", label: "🌱 Трава", cost: 8 },
     { id: "herb", label: "🐰 Заяц", cost: 45 },
@@ -31,24 +31,24 @@ const LIFE_DATA = {
     "лось": "ест всю растительность, каждые 5 ходов удобряет (+30% рост, 5 циклов)"
   },
   mutationEnergy: {
-    "крол-душегуб": 40,
-    "коала": 25,
-    "корова": 30,
-    "волк": 35,
-    "лось": 28
+    "крол-душегуб": 28,
+    "коала": 14,
+    "корова": 18,
+    "волк": 20,
+    "лось": 16
   },
   arcadeEnergy: {
     plantSprout: 0,
-    plantEvolveGrass: 1,
-    plantEvolveBush: 2,
-    plantWilt: 1,
-    animalBirth: 3,
-    animalDeath: 2,
-    hunt: 4,
-    krolDevour: 1,
-    fertilize: 2
+    plantEvolveGrass: 0,
+    plantEvolveBush: 1,
+    plantWilt: 0,
+    animalBirth: 1,
+    animalDeath: 1,
+    hunt: 1,
+    krolDevour: 0,
+    fertilize: 1
   },
-  plantEvolutionEnergy: 2,
+  plantEvolutionEnergy: 1,
   // Очки жизни: сумма произведённой и переработанной жизненной энергии.
   lifePoints: {
     plant: {

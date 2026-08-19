@@ -201,7 +201,7 @@ describe("энергия за эволюцию", () => {
     assert.equal(world.plantStageAt(3, 3), T.STAGE_BUSH);
     for (let i = 0; i < PLANT_CFG.bushToTree; i++) world.growPlants();
     assert.equal(world.plantStageAt(3, 3), T.STAGE_TREE);
-    const expected = LIFE_DATA.arcadeEnergy.plantEvolveGrass + LIFE_DATA.arcadeEnergy.plantEvolveBush;
+    const expected = LIFE_DATA.arcadeEnergy.plantEvolveBush;
     assert.ok(world.pendingEnergy >= expected, `минимум ${expected} ⚡, получили ${world.pendingEnergy}`);
   });
 
@@ -213,13 +213,13 @@ describe("энергия за эволюцию", () => {
     assert.equal(world.pendingEnergy, 0);
   });
 
-  test("трава → куст даёт ⚡", () => {
-    const { world, T, PLANT_CFG, LIFE_DATA } = createWorld();
+  test("трава → куст без ⚡", () => {
+    const { world, T, PLANT_CFG } = createWorld();
     world.arcade = true;
     world.setPlant(5, 5, T.STAGE_GRASS, PLANT_CFG.grassToBush - 1);
     world.step();
     assert.equal(world.plantStageAt(5, 5), T.STAGE_BUSH);
-    assert.equal(world.pendingEnergy, LIFE_DATA.arcadeEnergy.plantEvolveGrass);
+    assert.equal(world.pendingEnergy, 0);
   });
 });
 
@@ -228,9 +228,9 @@ describe("энергия за мутации видов", () => {
     const { world, LIFE_DATA } = createWorld();
     world.arcade = true;
     assert.equal(world.grantMutationEnergy("коала"), LIFE_DATA.mutationEnergy["коала"]);
-    assert.equal(world.pendingEnergy, 25);
+    assert.equal(world.pendingEnergy, 14);
     world.pendingEnergy = 0;
-    assert.equal(world.grantMutationEnergy("крол-душегуб"), 40);
+    assert.equal(world.grantMutationEnergy("крол-душегуб"), 28);
   });
 
   test("без аркады мутации не дают ⚡", () => {
@@ -735,12 +735,12 @@ describe("аркада: энергия за действия", () => {
     world.setPlant(2, 2, T.STAGE_GRASS, 0);
     world.plantAge[world.idx(2, 2)] = PLANT_CFG.grassToBush;
     world.growPlants();
-    assert.equal(world.pendingEnergy, LIFE_DATA.arcadeEnergy.plantEvolveGrass);
+    assert.equal(world.pendingEnergy, 0);
     world.plantAge[world.idx(2, 2)] = PLANT_CFG.bushToTree;
     world.growPlants();
     assert.equal(
       world.pendingEnergy,
-      LIFE_DATA.arcadeEnergy.plantEvolveGrass + LIFE_DATA.arcadeEnergy.plantEvolveBush
+      LIFE_DATA.arcadeEnergy.plantEvolveBush
     );
   });
 

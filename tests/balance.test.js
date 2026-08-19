@@ -33,13 +33,13 @@ describe("баланс: пассивный доход ⚡", () => {
   test("таблица arcadeEnergy покрывает ключевые события", () => {
     const { LIFE_DATA } = createWorld();
     const keys = [
-      "plantEvolveGrass", "plantEvolveBush", "plantWilt",
-      "animalBirth", "animalDeath", "hunt", "fertilize"
+      "plantEvolveBush", "animalBirth", "animalDeath", "hunt", "fertilize"
     ];
     for (const key of keys) {
       assert.ok(LIFE_DATA.arcadeEnergy[key] > 0, `${key} должен давать ⚡`);
     }
     assert.equal(LIFE_DATA.arcadeEnergy.plantSprout, 0, "прорастание не раздувает пассив");
+    assert.equal(LIFE_DATA.arcadeEnergy.plantEvolveGrass, 0, "трава→куст не раздувает пассив");
   });
 
   test("дерево окупает меньше половины травы", () => {
@@ -60,9 +60,9 @@ describe("баланс: пассивный доход ⚡", () => {
       LIFE_DATA.mutationEnergy["волк"] +
       LIFE_DATA.mutationEnergy["лось"]
     ) / 4;
-    assert.ok(avg < herb * 0.75);
-    assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] >= herb * 0.75);
-    assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] <= herb);
+    assert.ok(avg < herb * 0.5);
+    assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] >= herb * 0.55);
+    assert.ok(LIFE_DATA.mutationEnergy["крол-душегуб"] < herb);
   });
 
   test("симуляция: лес из 8 трав не даёт быстрый бесконечный доход", () => {
@@ -81,7 +81,7 @@ describe("баланс: пассивный доход ⚡", () => {
       if (totalEnergy > peak) peak = totalEnergy;
     }
 
-    assert.ok(peak <= 130, `за 80 циклов ожидали ≤130 ⚡, пик ${peak}`);
+    assert.ok(peak <= 50, `за 80 циклов ожидали ≤50 ⚡, пик ${peak}`);
     assert.ok(peak >= 1, "хотя бы одно дерево должно созреть");
   });
 });
@@ -110,6 +110,15 @@ describe("баланс: энергия экосистемы", () => {
       world.pendingEnergy = 0;
     }
     assert.ok(gained >= LIFE_DATA.arcadeEnergy.animalBirth, `ожидали доход от экосистемы, получили ${gained}`);
+  });
+});
+
+describe("баланс: кусты и трава", () => {
+  test("кусты сеют траву в 1.5 раза реже", () => {
+    const { PLANT_CFG } = createWorld();
+    assert.ok(Math.abs(PLANT_CFG.bushSpread - 0.055 / 1.5) < 0.002);
+    assert.equal(PLANT_CFG.bushFoodWeight, 0.4);
+    assert.ok(Math.abs(PLANT_CFG.bushViabilityWeight - 0.5 / 1.5) < 0.01);
   });
 });
 
