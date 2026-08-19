@@ -24,6 +24,7 @@ function createWorld(w = 24, h = 24) {
     world,
     T: ctx.LIFE_TYPES,
     PLANT_CFG: ctx.PLANT_CFG,
+    MUSHROOM_CFG: ctx.MUSHROOM_CFG,
     KROL_LIFESPAN: ctx.KROL_LIFESPAN,
     KROL_MOVES_PER_TICK: ctx.KROL_MOVES_PER_TICK,
     ARCADE_STALE_AFTER: ctx.ARCADE_STALE_AFTER,

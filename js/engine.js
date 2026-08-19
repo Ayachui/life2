@@ -1,4 +1,4 @@
-const EMPTY = 0, PLANT = 1, HERB = 2, PRED = 3, WALL = 4, WATER = 5, BEAR = 6;
+const EMPTY = 0, PLANT = 1, HERB = 2, PRED = 3, WALL = 4, WATER = 5, BEAR = 6, MUSHROOM = 7;
 
 const STAGE_GRASS = 1;
 const STAGE_BUSH = 2;
@@ -30,6 +30,7 @@ const DECAY_CFG = {
 };
 
 const FERTILIZER_CFG = { ttl: 5, strength: 0.3 };
+const MUSHROOM_CFG = { cowInterval: 18, cowChance: 0.12, energy: 2.5 };
 
 const TRAIT = {
   KROL: "крол-душегуб",
@@ -85,6 +86,10 @@ const BREED_COOL_INIT = { herb: 10, pred: 14 };
 const WATER_SLOW_MUL = 2;
 
 const SPECIAL_TRAITS = new Set([TRAIT.KROL, TRAIT.KOALA, TRAIT.COW, TRAIT.WOLF, TRAIT.ELK]);
+
+function skillMul(a) {
+  return a?.skillBoost ? 2 : 1;
+}
 
 function isTrait(a, t) {
   return !!a && a.trait === t;
@@ -385,8 +390,13 @@ class World {
     }
 
     for (const c of cells) {
+      if (this.get(c.x, c.y) === MUSHROOM) {
+        this.eatMushroom(a, c.x, c.y);
+        ate = true;
+        continue;
+      }
       if (this.get(c.x, c.y) !== PLANT) continue;
-      const energy = this.plantEnergyRemaining(c.x, c.y);
+      const energy = this.plantEnergyRemaining(c.x, c.y) * skillMul(a);
       a.energy += energy;
       this.awardProcessedEnergy(energy, a, this.plantStageTier(this.plantStage[this.idx(c.x, c.y)]));
       this.clearPlant(c.x, c.y);
@@ -511,6 +521,10 @@ class World {
   mealFromEating(a) {
     if (!a.eating) return null;
     const { x, y } = a.eating;
+    if (a.eating.mushroom) {
+      if (this.get(x, y) === MUSHROOM) return { x, y, mushroom: true };
+      return null;
+    }
     if (this.get(x, y) !== PLANT) return null;
     const stage = this.plantStageAt(x, y);
     if (stage === STAGE_GRASS || stage === STAGE_BUSH) return { x, y, stage };
@@ -519,6 +533,11 @@ class World {
   }
 
   startEating(a, meal) {
+    if (meal.mushroom) {
+      a.eating = { x: meal.x, y: meal.y, mushroom: true };
+      this.eatMushroom(a, meal.x, meal.y);
+      return;
+    }
     a.eating = { x: meal.x, y: meal.y };
     if (meal.stage === STAGE_TREE && this.plantBites[this.idx(meal.x, meal.y)] <= 0) {
       const bites = isCow(a) ? PLANT_CFG.treeBitesCow
@@ -760,7 +779,7 @@ class World {
   }
 
   perceive(agent) {
-    const range = agent.vision || 7;
+    const range = this.effectiveVision(agent);
     const anchor = this.agentAnchor(agent);
     const px = anchor.x;
     const py = anchor.y;
@@ -778,7 +797,9 @@ class World {
         const cheb = this.distCheb(px, py, nx, ny);
         if (man > range) continue;
 
-        if (this.get(nx, ny) === PLANT) {
+        if (this.get(nx, ny) === MUSHROOM) {
+          food.push({ x: nx, y: ny, mushroom: true, dist: cheb, man });
+        } else if (this.get(nx, ny) === PLANT) {
           const stage = this.plantStageAt(nx, ny);
           if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
             food.push({ x: nx, y: ny, stage, dist: cheb, man });
@@ -807,7 +828,7 @@ class World {
     }
 
     food.sort((a, b) => {
-      const rank = this.herbFoodRank(agent, a.stage) - this.herbFoodRank(agent, b.stage);
+      const rank = this.herbFoodRank(agent, a) - this.herbFoodRank(agent, b);
       if (rank !== 0) return rank;
       return a.man - b.man;
     });
@@ -828,7 +849,9 @@ class World {
     return this.canHunt(hunter, victim);
   }
 
-  herbFoodRank(agent, stage) {
+  herbFoodRank(agent, item) {
+    if (item.mushroom) return -1;
+    const stage = item.stage;
     if (isCow(agent)) {
       if (stage === STAGE_TREE) return 0;
       if (stage === STAGE_GRASS) return 1;
@@ -840,7 +863,35 @@ class World {
     return 2;
   }
 
+  effectiveVision(a) {
+    return Math.max(1, Math.round((a?.vision || 7) * skillMul(a)));
+  }
+
+  findNearestMushroom(x, y, range, metric = "scout") {
+    const distAt = metric === "touch"
+      ? (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy))
+      : (dx, dy) => Math.abs(dx) + Math.abs(dy);
+    let best = null;
+    let bestD = 99;
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (!dx && !dy) continue;
+        const dist = distAt(dx, dy);
+        if (dist > range || dist >= bestD) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (this.get(nx, ny) === MUSHROOM) {
+          bestD = dist;
+          best = { x: nx, y: ny, mushroom: true };
+        }
+      }
+    }
+    return best;
+  }
+
   findNearestEdible(x, y, range, metric = "scout", eater = null) {
+    const mushroom = this.findNearestMushroom(x, y, range, metric);
+    if (mushroom) return mushroom;
     const distAt = metric === "touch"
       ? (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy))
       : (dx, dy) => Math.abs(dx) + Math.abs(dy);
@@ -1000,6 +1051,7 @@ class World {
   moveIntervalFor(a) {
     let interval = a.moveInterval || 1;
     if (this.agentOnWater(a)) interval *= WATER_SLOW_MUL;
+    if (a.skillBoost) interval = Math.max(1, Math.floor(interval / 2));
     return interval;
   }
 
@@ -1238,7 +1290,8 @@ class World {
 
     const continuing = this.mealFromEating(a);
     if (continuing) {
-      this.eatPlant(a, continuing);
+      if (continuing.mushroom) this.eatMushroom(a, continuing.x, continuing.y);
+      else this.eatPlant(a, continuing);
       return;
     }
     if (a.eating) a.eating = null;
@@ -1279,6 +1332,13 @@ class World {
 
     const target = aware.prey[0];
     if (!target) {
+      const mush = aware.food.find((f) => f.mushroom);
+      if (mush) {
+        this.nudgeToward(a, mush.x, mush.y);
+        const touch = this.findNearestMushroom(a.x, a.y, 1, "touch");
+        if (touch) this.startEating(a, touch);
+        return;
+      }
       this.wanderAgent(a);
       return;
     }
@@ -1303,6 +1363,13 @@ class World {
 
     const target = aware.prey[0];
     if (!target) {
+      const mush = aware.food.find((f) => f.mushroom);
+      if (mush) {
+        this.nudgeToward(a, mush.x, mush.y);
+        const touch = this.findNearestMushroom(a.x, a.y, 1, "touch");
+        if (touch) this.startEating(a, touch);
+        return;
+      }
       this.wanderAgent(a);
       return;
     }
@@ -1324,7 +1391,8 @@ class World {
 
     const continuing = this.mealFromEating(a);
     if (continuing) {
-      this.eatPlant(a, continuing);
+      if (continuing.mushroom) this.eatMushroom(a, continuing.x, continuing.y);
+      else this.eatPlant(a, continuing);
       return;
     }
     if (a.eating) a.eating = null;
@@ -1357,7 +1425,8 @@ class World {
 
     const continuing = this.mealFromEating(a);
     if (continuing) {
-      this.eatPlant(a, continuing);
+      if (continuing.mushroom) this.eatMushroom(a, continuing.x, continuing.y);
+      else this.eatPlant(a, continuing);
       return;
     }
     if (a.eating) a.eating = null;
@@ -1367,7 +1436,7 @@ class World {
       return;
     }
 
-    const prey = this.findNearestAgent(a.x, a.y, a.vision || 5, preyKinds, a);
+    const prey = this.findNearestAgent(a.x, a.y, this.effectiveVision(a), preyKinds, a);
     if (prey) {
       this.nudgeToward(a, prey.x, prey.y);
       const adj = this.findNearestAgent(a.x, a.y, 1, preyKinds, a, "touch");
@@ -1493,6 +1562,7 @@ class World {
       gen: parent ? parent.gen + 1 : 1,
       bornGen: this.generation,
       cool: parent ? 0 : (kind === PRED ? BREED_COOL_INIT.pred : kind === HERB ? BREED_COOL_INIT.herb : 0),
+      skillBoost: false,
       dead: false,
       eating: null,
       moveInterval: parent ? (parent.moveInterval || 1) : d.moveInterval,
@@ -1853,6 +1923,35 @@ class World {
     });
   }
 
+  tryPlantMushroomNear(x, y) {
+    const spot = this.findNeighbor(x, y, EMPTY);
+    if (!spot) return false;
+    if (this.arcade && !this.inDish(spot.x, spot.y)) return false;
+    this.set(spot.x, spot.y, MUSHROOM);
+    this.spark(spot.x, spot.y, "#c77dff");
+    this.chime("mushroom_plant");
+    return true;
+  }
+
+  eatMushroom(a, x, y) {
+    if (!a || this.get(x, y) !== MUSHROOM) return false;
+    this.set(x, y, EMPTY);
+    const firstBoost = !a.skillBoost;
+    if (firstBoost) {
+      a.skillBoost = true;
+      this.chime("mushroom_boost");
+      this.fx.push({ x, y, color: "#e040fb", t: 1.6 });
+    } else {
+      this.chime("mushroom_eat");
+    }
+    const gained = MUSHROOM_CFG.energy * skillMul(a);
+    a.energy += gained;
+    this.awardProcessedEnergy(gained, a, 1);
+    this.spark(x, y, "#d4a5ff");
+    a.eating = null;
+    return true;
+  }
+
   addFertilizer(x, y) {
     this.fertilizers.push({
       x, y,
@@ -1952,7 +2051,7 @@ class World {
   }
 
   seekPred(a) {
-    const target = this.findNearestPrey(a.x, a.y, a.vision || 10, a);
+    const target = this.findNearestPrey(a.x, a.y, this.effectiveVision(a), a);
     if (!target) {
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
       const d = dirs[Math.floor(Math.random() * 4)];
@@ -1971,7 +2070,7 @@ class World {
       const perBite = stage === STAGE_GRASS
         ? PLANT_CFG.grassEnergy / PLANT_CFG.grassBites
         : PLANT_CFG.bushEnergyPerBite;
-      const gained = perBite * mult;
+      const gained = perBite * mult * skillMul(a);
       this.plantBites[i]--;
       a.energy += gained;
       this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
@@ -1988,8 +2087,9 @@ class World {
         : PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
       for (let b = 0; b < bitesThisTick && this.plantBites[i] > 0; b++) {
         this.plantBites[i]--;
-        a.energy += perBite;
-        this.awardProcessedEnergy(perBite, a, this.plantStageTier(stage));
+        const gained = perBite * skillMul(a);
+        a.energy += gained;
+        this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
       }
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
@@ -2027,7 +2127,7 @@ class World {
     victim.dead = true;
     this.deaths++;
     this.addDecay(victim.x, victim.y, victim.kind);
-    killer.energy += gain;
+    killer.energy += gain * skillMul(killer);
     this.awardDeathPoints(victim);
     this.awardProcessedEnergy(gain, killer, this.agentTier(victim));
     this.grantArcadeEnergy("hunt");
@@ -2094,6 +2194,14 @@ class World {
       if (isElk(a) && (a.stepsSincePoop || 0) >= ELK_POOP_INTERVAL) {
         this.addFertilizer(a.x, a.y);
         a.stepsSincePoop = 0;
+      }
+
+      if (isCow(a)) {
+        a.stepsSinceMush = (a.stepsSinceMush || 0) + 1;
+        if (a.stepsSinceMush >= MUSHROOM_CFG.cowInterval) {
+          a.stepsSinceMush = 0;
+          if (Math.random() < MUSHROOM_CFG.cowChance) this.tryPlantMushroomNear(a.x, a.y);
+        }
       }
 
       a.energy -= a.drain;
@@ -2193,8 +2301,10 @@ class World {
 }
 
 window.World = World;
-window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
+window.LIFE_TYPES = { EMPTY, PLANT, HERB, PRED, WALL, WATER, BEAR, MUSHROOM, STAGE_GRASS, STAGE_BUSH, STAGE_TREE };
 window.PLANT_CFG = PLANT_CFG;
+window.MUSHROOM_CFG = MUSHROOM_CFG;
+window.skillMul = skillMul;
 window.KROL_LIFESPAN = KROL_LIFESPAN;
 window.KROL_MOVES_PER_TICK = KROL_MOVES_PER_TICK;
 window.TRAIT = TRAIT;

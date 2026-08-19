@@ -13,6 +13,9 @@ const LifeSound = (() => {
     wilt: 350,
     hunt: 280,
     krol_eat: 120,
+    mushroom_plant: 200,
+    mushroom_eat: 90,
+    mushroom_boost: 0,
     death_herb: 320,
     death_pred: 400,
     birth: 200,
@@ -193,6 +196,18 @@ const LifeSound = (() => {
       setTimeout(() => slide(920, 160, 0.4, "square", 0.05), 220);
       setTimeout(() => tone(55, 0.5, "sine", 0.04), 380);
     },
+    mushroom_plant() {
+      slide(280, 420, 0.12, "sine", 0.022);
+      setTimeout(() => tone(520, 0.06, "triangle", 0.016), 50);
+    },
+    mushroom_eat() {
+      noiseBurst(0.05, 0.03, 900);
+      tone(240, 0.07, "sine", 0.018);
+    },
+    mushroom_boost() {
+      chord([392, 494, 622, 784], 0.28, 0.026);
+      setTimeout(() => slide(520, 880, 0.14, "sine", 0.022), 80);
+    },
     krol_eat() {
       slide(95, 42, 0.18, "sawtooth", 0.065);
       setTimeout(() => tone(48, 0.22, "sine", 0.05), 40);
@@ -259,6 +274,7 @@ const LifeSound = (() => {
     if (!enabled) return;
     if (name !== "ui" && name !== "mutate" && name !== "game_over" && name !== "score"
       && name !== "energy_bonus" && name !== "krol_dushegub" && name !== "krol_fade"
+      && name !== "mushroom_boost"
       && !name.startsWith("roulette_") && !canPlay(name)) return;
     const fn = SFX[name];
     if (fn) fn(opts);
