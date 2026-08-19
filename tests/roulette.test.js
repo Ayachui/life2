@@ -21,9 +21,12 @@ describe("рулетка: угол стрелки", () => {
     }
   });
 
-  test("старые углы не совпадали с событием", () => {
-    const legacy = { earthquake: 2025, flood: 2250, plague: 2475, evolution: 2700 };
-    assert.notEqual(rouletteSliceAtPointer(legacy.earthquake), "earthquake");
-    assert.notEqual(rouletteSliceAtPointer(legacy.plague), "plague");
+  test("старый расчёт (360 - center) не совпадал с событием", () => {
+    const legacySpin = (event) => {
+      const center = ROULETTE_SLICE_CENTER[event];
+      return 5 * 360 + (360 - center);
+    };
+    assert.notEqual(rouletteSliceAtPointer(legacySpin("earthquake")), "earthquake");
+    assert.notEqual(rouletteSliceAtPointer(legacySpin("flood")), "flood");
   });
 });
