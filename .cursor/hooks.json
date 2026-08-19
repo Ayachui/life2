@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": "node .cursor/hooks/ship-to-prod.cjs",
+        "timeout": 120
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "node .cursor/hooks/ship-to-prod.cjs",
+        "timeout": 120
+      }
+    ]
+  }
+}
