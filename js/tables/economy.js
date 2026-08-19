@@ -1,6 +1,7 @@
 /**
  * Экономика игрока: цены кисти, стартовый бюджет, ⚡.
- * Закон: живой мир платит очками. Стартовый ⚡ не сгорает; импульс — пока живы зайцы.
+ * Пирамида: трава(8) → заяц(45) → лиса(90) → медведь(175).
+ * Импульс: cap=90 до лисы в цепочке, cap=175 после. Очки — от живой пирамиды.
  */
 (function (root) {
   const T = root.LIFE_TABLES || (root.LIFE_TABLES = {});
@@ -40,10 +41,12 @@
       maxEnergyPerGen: 8,
       discoveryOnlyMutation: true,
       surplusDecay: 0,
-      /** ⚡ копится, пока живы зайцы, до cap. Лес кошелёк не ест. */
+      /** ⚡ копится, пока живы зайцы. Cap 90 → 175 после лисы в устойчивой цепочке. */
       pulsePerGen: 1,
       pyramidPulse: 0.5,
-      pulseCap: 90
+      pulseCap: 90,
+      pulseCapApex: 175,
+      upkeep: { freeBiomass: 96, perExtra: 0.03, max: 2 }
     },
 
     mutationEnergy: {

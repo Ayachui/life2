@@ -343,6 +343,10 @@ var World = class World {
       return true;
     }
     if (brush === "herb" || brush === "pred" || brush === "bear") {
+      if (this.arcade) {
+        const gate = this.arcadeToolGate(brush);
+        if (!gate.ok) return false;
+      }
       if (!this.canPlaceAnimalAt(x, y)) return false;
       const kind = brush === "herb" ? HERB : brush === "pred" ? PRED : BEAR;
       this.set(x, y, kind);

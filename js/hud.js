@@ -142,12 +142,28 @@ function hudObjective(world, meta = {}) {
   }
   const chain = hudChain(world);
   if (!chain.locked) {
-    return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроются очки за время.` };
+    return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроется эра и пирамида ⚡.` };
   }
-  const cap = hudBalance().arcadeEconomy?.pulseCap ?? 90;
+  const era = hudEra(world);
+  const baseCap = hudBalance().arcadeEconomy?.pulseCap ?? 90;
+  const apexCap = hudBalance().arcadeEconomy?.pulseCapApex ?? 175;
+  const c = world?.counts?.() || {};
+  const hasPred = (c.preds || 0) > 0;
+  const cap = hasPred ? apexCap : baseCap;
+  if (era) {
+    const late = era.left <= 40;
+    return {
+      title: late ? "Финал эры" : "Эра эксперимента",
+      line: hasPred
+        ? `⚡ до ${cap}. Осталось ${era.left} циклов — максимум очков. Рулетка каждые 100.`
+        : `⚡ до ${baseCap}. ≥4 зайца → лиса → cap ${apexCap}. Эра: ${era.left} циклов.`
+    };
+  }
   return {
     title: "Цепочка жива",
-    line: `⚡ копится до ${cap}, пока есть зайцы. Лиса в пирамиде — быстрее. Рулетка каждые 100, позже жёстче.`
+    line: hasPred
+      ? `⚡ копится до ${cap}. Копи на медведя (${apexCap}). Рулетка каждые 100.`
+      : `⚡ до ${baseCap}. Построй пирамиду: ≥4 зайца, потом лиса — cap ${apexCap} и очки за время.`
   };
 }
 
@@ -175,7 +191,7 @@ function hudModel(world, meta = {}) {
     score: world?.lifePoints || 0,
     energy,
     budget,
-    pulseCap: hudBalance().arcadeEconomy?.pulseCap ?? 90,
+    pulseCap: world?.arcadePulseCap?.() ?? hudBalance().arcadeEconomy?.pulseCap ?? 90,
     energyBand: hudEnergyBand(energy, herbCost, predCost, plantCost),
     energyRatio: Number.isFinite(energy) && budget ? Math.min(1, energy / Math.max(1, budget)) : null,
     chain,

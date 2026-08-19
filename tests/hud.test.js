@@ -1,5 +1,9 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
+const { loadEngine } = require("./harness.cjs");
+const engine = loadEngine();
+global.LIFE_BALANCE = engine.LIFE_BALANCE;
+global.LIFE_DATA = engine.LIFE_DATA;
 const {
   hudNum, hudEnergyBand, hudThreat, hudChain, hudObjective, hudModel, hudRouletteEta,
   hudSpecials, hudTrophic, hudEra
@@ -108,20 +112,24 @@ describe("HUD: взгляд за секунду", () => {
     assert.equal(withKoala.extra[0].value, 1);
   });
 
-  test("после цепочки цель про запас ⚡, не про эру", () => {
-    assert.equal(hudEra({
+  test("после цепочки цель про пирамиду и эру", () => {
+    const era = hudEra({
       sustainedChain: true,
       chainLockGen: 40,
       generation: 80
-    }), null);
+    });
+    assert.ok(era);
+    assert.equal(era.left, 260);
     const o = hudObjective({
       sustainedChain: true,
       chainLockGen: 40,
       generation: 80,
       arcade: true,
-      herbivoreCount: () => 3
+      herbivoreCount: () => 3,
+      counts: () => ({ preds: 0, herbs: 3, plants: 5 }),
+      predatorCount: () => 0
     }, { gameType: "arcade", started: true });
-    assert.match(o.line, /копится/);
-    assert.equal(o.title, "Цепочка жива");
+    assert.match(o.line, /4 зайца/);
+    assert.match(o.line, /175/);
   });
 });

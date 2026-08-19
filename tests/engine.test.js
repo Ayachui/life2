@@ -653,6 +653,9 @@ describe("лес без зверей", () => {
     world.tickSurvivalPoints();
     assert.equal(world.lifePoints, 0);
     world.sustainedChain = true;
+    world.setPlant(2, 2, T.STAGE_GRASS, 0);
+    world.set(3, 3, T.PRED);
+    world.agents.push(world.makeAgent(3, 3, T.PRED));
     world.tickSurvivalPoints();
     assert.ok(world.lifePoints > 0);
   });

@@ -450,6 +450,12 @@
     }
   }
 
+  function toolBlocked(id) {
+    if (app.gameType !== "arcade" || !app.world?.arcadeToolGate) return null;
+    const gate = app.world.arcadeToolGate(id);
+    return gate.ok ? null : gate.reason;
+  }
+
   function renderTools() {
     const grid = $("tool-grid");
     grid.innerHTML = "";
@@ -457,15 +463,18 @@
       if (app.gameType === "arcade" && t.id === "erase") continue;
       const b = document.createElement("button");
       const cost = toolCost(t.id);
+      const blockReason = toolBlocked(t.id);
       const cantAfford = app.gameType === "arcade" && cost > 0 && app.energy < cost;
-      b.className = "tool" + (app.tool === t.id ? " active" : "") + (cantAfford ? " disabled" : "");
+      const blocked = blockReason != null;
+      b.className = "tool" + (app.tool === t.id ? " active" : "") + ((cantAfford || blocked) ? " disabled" : "");
       const costHtml = cost ? `<small>⚡${cost}</small>` : "";
       const icon = toolIconHtml(t);
       b.innerHTML = isMobileUi()
         ? icon + costHtml
         : (t.glyph ? `${icon} ${t.label.replace(/^[^\s]+\s*/, "")}` : t.label) + costHtml;
-      b.title = LIFE_DATA.toolHelp[t.id] || "";
+      b.title = blockReason || LIFE_DATA.toolHelp[t.id] || "";
       b.onclick = () => {
+        if (blocked) { toast(blockReason, { log: "skip" }); return; }
         if (cantAfford) { toast("Не хватает энергии", { log: "skip" }); return; }
         if (app.tool === "inspect" && t.id !== "inspect") app.inspect = null;
         app.tool = t.id;
@@ -625,19 +634,33 @@
         chainEl.classList.remove("hidden");
         chainEl.classList.toggle("is-locked", model.chain.locked);
         chainEl.classList.remove("is-era", "is-era-late");
+        if (model.era) {
+          chainEl.classList.add("is-era");
+          if (model.era.late) chainEl.classList.add("is-era-late");
+        }
         if (model.chain.locked && !app.hudPrev.chainLocked) {
           flashStat(chainEl, "is-up");
           spawnHudPop("Цепочка жива!", "score");
-          toast("Цепочка жива — ⚡ копится, пока есть зайцы", { important: true });
+          toast("Цепочка жива — эра началась: построй пирамиду и копи ⚡", { important: true });
         }
         app.hudPrev.chainLocked = model.chain.locked;
         const bar = $("hud-chain-bar");
-        if (bar) bar.style.width = `${Math.round((model.chain.locked ? 1 : model.chain.ratio) * 100)}%`;
+        if (bar) {
+          const ratio = model.era
+            ? model.era.ratio
+            : (model.chain.locked ? 1 : model.chain.ratio);
+          bar.style.width = `${Math.round(ratio * 100)}%`;
+        }
         const val = $("hud-chain-val");
-        if (val) val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
+        if (val) {
+          if (model.era) val.textContent = String(model.era.left);
+          else val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
+        }
         const lab = $("hud-chain-label");
-        if (lab) lab.textContent = "Цепочка";
-        chainEl.title = "Живая цепочка";
+        if (lab) lab.textContent = model.era ? "Эра" : "Цепочка";
+        chainEl.title = model.era
+          ? `Осталось ${model.era.left} циклов до конца эксперимента`
+          : "Живая цепочка";
       } else {
         chainEl.classList.add("hidden");
       }
@@ -874,6 +897,8 @@
   function canPaint() {
     if (app.gameEnded) return false;
     if (app.gameType === "arcade" && app.tool !== "inspect" && app.tool !== "erase") {
+      const blockReason = toolBlocked(app.tool);
+      if (blockReason) return false;
       const cost = toolCost(app.tool);
       if (cost > app.energy) return false;
     }
@@ -891,7 +916,8 @@
     const cellKey = `${app.tool}:${x},${y}`;
     if (app.lastPaintCell === cellKey) return;
     if (!canPaint()) {
-      toast("Не хватает энергии", { log: "skip" });
+      const blockReason = toolBlocked(app.tool);
+      toast(blockReason || "Не хватает энергии", { log: "skip" });
       return;
     }
     const cost = toolCost(app.tool);

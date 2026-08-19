@@ -107,6 +107,7 @@ World.prototype.awardPlantLifePoints = function awardPlantLifePoints(eventKey) {
 
 World.prototype.tickSurvivalPoints = function tickSurvivalPoints() {
     if (!this.arcade || !this.sustainedChain) return;
+    if (this.predatorCount() <= 0 || this.counts().plants <= 0) return;
     if (this.generation <= 0 || this.generation % SURVIVAL_POINT_INTERVAL !== 0) return;
     const mul = this.ecosystemRewardMul();
     if (mul <= 0) return;

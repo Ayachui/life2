@@ -235,7 +235,35 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     }
   });
 
-  test("живая чашка не заканчивается по эре", () => {
+  test("cap растёт до apex после лисы в цепочке", () => {
+    const { world, T, LIFE_BALANCE } = createWorld();
+    world.arcade = true;
+    world.sustainedChain = true;
+    world.set(4, 4, T.HERB);
+    world.set(5, 5, T.PRED);
+    world.agents = [world.makeAgent(4, 4, T.HERB), world.makeAgent(5, 5, T.PRED)];
+    assert.equal(world.arcadePulseCap(), LIFE_BALANCE.arcadeEconomy.pulseCapApex);
+    world.agents.pop();
+    world.set(5, 5, 0);
+    assert.equal(world.arcadePulseCap(), LIFE_BALANCE.arcadeEconomy.pulseCap);
+  });
+
+  test("лису нельзя купить при <4 зайцах", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.setPlant(3, 3, T.STAGE_GRASS, 0);
+    world.set(4, 4, T.HERB);
+    world.agents = [world.makeAgent(4, 4, T.HERB)];
+    assert.equal(world.arcadeToolGate("pred").ok, false);
+    for (let i = 0; i < 3; i++) {
+      world.set(5 + i, 4, T.HERB);
+      world.agents.push(world.makeAgent(5 + i, 4, T.HERB));
+    }
+    world.invalidateCountsCache();
+    assert.equal(world.arcadeToolGate("pred").ok, true);
+  });
+
+  test("эра завершает эксперимент после лимита", () => {
     const { world, T } = createWorld();
     world.arcade = true;
     world.set(4, 4, T.HERB);
@@ -245,8 +273,25 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     world.chainLockGen = 10;
     world.generation = 800;
     world.checkArcadeEnd(0, 45);
+    assert.equal(world.gameOver, true);
+    assert.equal(world.gameOverReason, "era_complete");
+    const era = world.eraProgress();
+    assert.ok(era);
+    assert.equal(era.left, 0);
+  });
+
+  test("до конца эры партия продолжается", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.set(4, 4, T.HERB);
+    world.agents = [world.makeAgent(4, 4, T.HERB)];
+    world.setPlant(5, 5, T.STAGE_GRASS, 0);
+    world.sustainedChain = true;
+    world.chainLockGen = 100;
+    world.generation = 200;
+    world.checkArcadeEnd(0, 45);
     assert.equal(world.gameOver, false);
-    assert.equal(world.eraProgress(), null);
+    assert.ok(world.eraProgress().left > 0);
   });
 
   test("давление рулетки растёт со временем", () => {

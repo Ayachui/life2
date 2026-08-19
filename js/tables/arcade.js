@@ -12,7 +12,8 @@
       chainSustainGens: 25,
       noAnimalRenewalGens: 90,
       survivalPointInterval: 100,
-      eraAfterChain: 0
+      /** После устойчивой цепочки — конечная эра (очки + рулетка), не бесконечная ферма. */
+      eraAfterChain: 300
     },
 
     roulette: {

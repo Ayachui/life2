@@ -23,7 +23,7 @@ World.prototype.foldEnergyAudit = function foldEnergyAudit() {
   };
 
 World.prototype.arcadeUpkeep = function arcadeUpkeep() {
-    if (!this.arcade) return 0;
+    if (!this.arcade || !this.sustainedChain) return 0;
     const u = this.arcadeEconomyCfg().upkeep;
     if (!u || !(u.max > 0)) return 0;
     const c = this.counts();
@@ -48,8 +48,32 @@ World.prototype.arcadeSurplusDecay = function arcadeSurplusDecay() {
 
 World.prototype.arcadePulseCap = function arcadePulseCap() {
     const eco = this.arcadeEconomyCfg();
-    if (eco.pulseCap != null) return eco.pulseCap;
-    return this.arcadeBudget ?? 90;
+    const apex = eco.pulseCapApex ?? eco.pulseCap ?? 90;
+    const base = eco.pulseCap ?? 90;
+    if (this.sustainedChain && this.predatorCount() > 0) return apex;
+    return base;
+  };
+
+World.prototype.arcadeToolGate = function arcadeToolGate(toolId) {
+    if (!this.arcade) return { ok: true };
+    const c = this.counts();
+    if (toolId === "pred") {
+      if (c.herbs < 4) {
+        return { ok: false, reason: "Нужно ≥4 зайцев — иначе лисе нечего есть" };
+      }
+      if (c.preds > 0 && c.herbs / c.preds < 1.3) {
+        return { ok: false, reason: "Слишком много лис — подкорми зайцев" };
+      }
+    }
+    if (toolId === "bear") {
+      if (!this.sustainedChain) {
+        return { ok: false, reason: "Сначала устойчивая цепочка (25 циклов с зайцами)" };
+      }
+      if (c.herbs < 6) {
+        return { ok: false, reason: "Нужно ≥6 зайцев — медведю нужна добыча" };
+      }
+    }
+    return { ok: true };
   };
 
 World.prototype.clampArcadePending = function clampArcadePending() {
