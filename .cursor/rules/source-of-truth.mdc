@@ -9,7 +9,9 @@ alwaysApply: true
 |-----|-----|
 | Прод | `origin/main` → Vercel (`life.tzunki.com`) |
 | Версия | `LIFE_DATA.gameVersion` на `origin/main` |
-| Звери и баланс | `js/data.js` + `js/engine.js` после `merge origin/main` |
+| Числа баланса | `js/tables/*` → `LIFE_BALANCE` |
+| Тексты | `js/content/*` → `LIFE_DATA` |
+| Симуляция | `js/sim/*` после `merge origin/main` |
 
 ## Закон веток
 

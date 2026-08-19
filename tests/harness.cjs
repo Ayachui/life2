@@ -1,21 +1,25 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const { LIFE_BOOT_SCRIPTS } = require("../js/boot-order.cjs");
 
 const ROOT = path.join(__dirname, "..");
 
+function runScript(sandbox, rel) {
+  const code = fs.readFileSync(path.join(ROOT, rel), "utf8");
+  vm.runInContext(code, sandbox, { filename: rel });
+}
+
 function loadEngine() {
-  const sandbox = { window: {} };
+  const sandbox = { window: {}, globalThis: null };
   sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
-  const balance = fs.readFileSync(path.join(ROOT, "js/balance.js"), "utf8");
-  const data = fs.readFileSync(path.join(ROOT, "js/data.js"), "utf8");
-  const engine = fs.readFileSync(path.join(ROOT, "js/engine.js"), "utf8");
-  const terrain = fs.readFileSync(path.join(ROOT, "js/terrain.js"), "utf8");
-  vm.runInContext(balance, sandbox);
-  vm.runInContext(`${data}\nthis.LIFE_DATA = LIFE_DATA;`, sandbox);
-  vm.runInContext(engine, sandbox);
-  vm.runInContext(terrain, sandbox);
+  for (const rel of LIFE_BOOT_SCRIPTS) {
+    runScript(sandbox, rel);
+  }
+  runScript(sandbox, "js/terrain.js");
+  sandbox.LIFE_DATA = sandbox.LIFE_DATA || sandbox.window.LIFE_DATA;
   return sandbox;
 }
 
@@ -37,6 +41,7 @@ function createWorld(w = 24, h = 24) {
     CHAIN_SUSTAIN_GENS: ctx.CHAIN_SUSTAIN_GENS,
     LIFE_DATA: ctx.LIFE_DATA,
     LIFE_BALANCE: ctx.LIFE_BALANCE,
+    LIFE_TABLES: ctx.LIFE_TABLES,
     MUT_CHANCE: ctx.MUT_CHANCE,
     TerrainArt: ctx.TerrainArt
   };

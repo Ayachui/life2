@@ -76,18 +76,34 @@
               <button class="icon-btn" id="btn-music" type="button" title="Музыка" aria-pressed="true">🎵</button>
               <button class="icon-btn" id="btn-sound" type="button" title="Звук" aria-pressed="true">🔊</button>
             </div>
-            <div class="play-head-stats">
-              <div class="cycle-badge" id="cycle-badge" title="Циклы">
-                <span class="cycle-ico" id="cycle-ico" aria-hidden="true">⏱</span>
-                <strong id="cycle-val">0</strong>
+            <div class="play-head-stats" id="hud-scoreboard">
+              <div class="hud-stat" id="cycle-badge" title="Циклы">
+                <span class="hud-stat-ico" id="cycle-ico" aria-hidden="true">⏱</span>
+                <div class="hud-stat-body">
+                  <small id="cycle-label">Циклы</small>
+                  <strong id="cycle-val">0</strong>
+                </div>
               </div>
-              <div class="life-badge hidden" id="life-badge" title="Очки жизни">
-                <span class="life-ico" aria-hidden="true">✦</span>
-                <strong id="life-points-val">0</strong>
+              <div class="hud-stat hud-stat--score hidden" id="life-badge" title="Очки жизни">
+                <span class="hud-stat-ico" aria-hidden="true">✦</span>
+                <div class="hud-stat-body">
+                  <small>Очки</small>
+                  <strong id="life-points-val">0</strong>
+                </div>
+                <span class="hud-delta hidden" id="hud-score-delta"></span>
               </div>
-              <div class="energy-pill energy-pill--play hidden" id="energy-pill-play">
-                <span>⚡</span>
-                <strong id="energy-val-play">0</strong>
+              <div class="hud-stat hud-stat--energy hidden" id="energy-pill-play">
+                <span class="hud-stat-ico" aria-hidden="true">⚡</span>
+                <div class="hud-stat-body">
+                  <small>Энергия</small>
+                  <strong id="energy-val-play">0</strong>
+                </div>
+                <span class="hud-energy-track" aria-hidden="true"><i id="hud-energy-bar"></i></span>
+              </div>
+              <div class="hud-chain hidden" id="hud-chain" title="Живая цепочка">
+                <span class="hud-chain-label" id="hud-chain-label">Цепочка</span>
+                <span class="hud-chain-track"><i id="hud-chain-bar"></i></span>
+                <strong id="hud-chain-val">0/25</strong>
               </div>
             </div>
             <div class="play-head-side play-head-side--right">
@@ -99,20 +115,23 @@
           <div class="stage" id="stage">
             <canvas id="world"></canvas>
             <div class="plague-fog hidden" id="plague-fog" aria-hidden="true"></div>
-            <div class="legend" id="legend"></div>
+            <div class="stage-hud" id="stage-hud" aria-live="polite">
+              <div class="hud-objective" id="hud-objective"></div>
+              <div class="hud-threat hidden" id="hud-threat"></div>
+              <div class="hud-pops" id="hud-pops" aria-hidden="true"></div>
+              <div class="hud-trophic" id="hud-trophic"></div>
+              <div class="inspect-card inspect-card--stage hidden" id="inspect-card-stage"></div>
+            </div>
           </div>
         </main>
 
-        <aside class="panel hud" aria-label="Статистика">
-          <div class="mission-card" id="hud-card">
-            <h3 id="hud-goal-title">Цель</h3>
-            <p id="hud-goal">Продержись как можно дольше.</p>
-            <p class="hint" id="hud-hint"></p>
+        <aside class="panel hud" aria-label="Состояние мира">
+          <div class="hud-live" id="hud-live">
+            <div class="hud-viability" id="hud-viability"></div>
           </div>
           <div class="stats" id="stats-grid"></div>
-          <div class="analytics" id="analytics"></div>
           <div class="inspect-card hidden" id="inspect-card"></div>
-          <div class="log" id="log"></div>
+          <div class="hud-feed" id="log" aria-label="События"></div>
         </aside>
       </div>
     </section>
@@ -175,13 +194,31 @@
   </div>
   <div id="toasts" class="toasts"></div>
 
+  <script src="js/tables/meta.js"></script>
+  <script src="js/tables/economy.js"></script>
+  <script src="js/tables/scoring.js"></script>
+  <script src="js/tables/species.js"></script>
+  <script src="js/tables/ecology.js"></script>
+  <script src="js/tables/arcade.js"></script>
   <script src="js/balance.js"></script>
+  <script src="js/content/tools.js"></script>
+  <script src="js/content/rules.js"></script>
+  <script src="js/content/help.js"></script>
+  <script src="js/content/roulette.js"></script>
   <script src="js/data.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/music.js"></script>
+  <script src="js/sim/types.js"></script>
+  <script src="js/sim/world.js"></script>
+  <script src="js/sim/scoring.js"></script>
+  <script src="js/sim/economy.js"></script>
+  <script src="js/sim/ecology.js"></script>
+  <script src="js/sim/arcade.js"></script>
+  <script src="js/sim/life.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/terrain.js"></script>
   <script src="js/leaderboard.js"></script>
+  <script src="js/hud.js"></script>
   <script src="js/app.js"></script>
   <script src="js/debug-lib.js"></script>
   <script src="js/debug.js"></script>

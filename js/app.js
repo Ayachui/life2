@@ -27,7 +27,8 @@
     rouletteResume: false,
     statsCacheKey: "",
     energyLedger: { spent: 0, earned: 0, upkeep: 0 },
-    energyHistory: []
+    energyHistory: [],
+    hudPrev: { score: 0, energy: null, chainLocked: false }
   };
 
   const canvas = $("world");
@@ -113,13 +114,15 @@
     }
   }
 
-  function toast(text) {
+  function toast(text, opts = {}) {
     const el = document.createElement("div");
     el.className = "toast";
     el.textContent = text;
     $("toasts").appendChild(el);
     setTimeout(() => el.remove(), 2200);
-    log(text);
+    if (opts.log !== false && opts.log !== "skip") {
+      if (opts.log === true || opts.important) log(text);
+    }
     LifeSound.play("ui");
   }
 
@@ -306,7 +309,7 @@
     const m = app.world?.lastMutation;
     if (!m) return;
     const bonus = energyBonusLabel(energyGain);
-    toast(`Новый вид: ${m.trait}${bonus}`);
+    toast(`Новый вид: ${m.trait}${bonus}`, { important: true });
     app.mutToastAt = performance.now();
     if (app.world) app.world.lastMutation = null;
   }
@@ -455,7 +458,7 @@
         : (t.glyph ? `${icon} ${t.label.replace(/^[^\s]+\s*/, "")}` : t.label) + costHtml;
       b.title = LIFE_DATA.toolHelp[t.id] || "";
       b.onclick = () => {
-        if (cantAfford) { toast("Не хватает энергии"); return; }
+        if (cantAfford) { toast("Не хватает энергии", { log: "skip" }); return; }
         if (app.tool === "inspect" && t.id !== "inspect") app.inspect = null;
         app.tool = t.id;
         renderTools();
@@ -464,18 +467,17 @@
       grid.appendChild(b);
     }
     refreshToolIcons();
-    $("tool-help").textContent = LIFE_DATA.toolHelp[app.tool] || "";
+    $("tool-help").textContent = firstToolLine(LIFE_DATA.toolHelp[app.tool] || "");
   }
 
   function updateEnergy() {
     const pill = $("energy-pill");
     const pillPlay = $("energy-pill-play");
-    const text = String(app.energy);
     if (app.gameType === "arcade") {
       pill.classList.remove("hidden");
-      $("energy-val").textContent = text;
+      if ($("energy-val")) $("energy-val").textContent = LifeHud.hudNum(app.energy);
       pillPlay?.classList.remove("hidden");
-      if ($("energy-val-play")) $("energy-val-play").textContent = text;
+      if ($("energy-val-play")) $("energy-val-play").textContent = LifeHud.hudNum(app.energy);
       recordEnergyHistory();
     } else {
       pill.classList.add("hidden");
@@ -484,17 +486,204 @@
     renderTools();
   }
 
-  function legend() {
-    const items = [
-      ["🌱", "трава"], ["🌿", "куст"], ["🌳", "дерево"],
-      ["🐰", "заяц"], ["🐨", "коала"], ["🐮", "корова"], ["🐇", "крол-душегуб"],
-      ["🦊", "лиса"], ["🐺", "волк"], ["🦌", "лось"], ["🐻", "медведь"],
-      ['<canvas class="tile-icon tile-icon--water tile-icon--legend" width="18" height="18" aria-hidden="true"></canvas>', "водоём"],
-      ['<canvas class="tile-icon tile-icon--stone tile-icon--legend" width="18" height="18" aria-hidden="true"></canvas>', "камень"],
-      ["🦴", "разложение"]
-    ];
-    $("legend").innerHTML = items.map(([mark, n]) => `<span>${mark} ${n}</span>`).join("");
-    refreshToolIcons();
+  function firstToolLine(text) {
+    const cut = text.split(/(?<=\.)\s/)[0];
+    return cut || text;
+  }
+
+  function spawnHudPop(text, kind) {
+    const box = $("hud-pops");
+    if (!box) return;
+    const el = document.createElement("div");
+    el.className = "hud-pop" + (kind === "energy" ? " is-energy" : "");
+    el.textContent = text;
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+
+  function flashStat(el, cls) {
+    if (!el) return;
+    el.classList.remove("is-up", "is-down");
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function chipClass(id, value, an) {
+    if (!value) return "is-zero";
+    if (id === "herb" && an.label === "голод") return "is-hot";
+    if (id === "pred" && an.label === "слишком много лис") return "is-hot";
+    if (id === "herb" && (an.label === "баланс" || an.label === "устойчиво")) return "is-ok";
+    return "";
+  }
+
+  function renderTrophic(listEl, trophic, an) {
+    if (!listEl) return;
+    const chips = [...trophic.core, ...trophic.extra].map((s) => (
+      `<span class="hud-chip ${chipClass(s.id, s.value, an)}" title="${s.label}">${s.icon} ${s.value}</span>`
+    )).join("");
+    listEl.innerHTML = chips;
+  }
+
+  let hudDeltaTimer = 0;
+
+  function showScoreDelta(delta) {
+    const deltaEl = $("hud-score-delta");
+    if (!deltaEl) return;
+    deltaEl.textContent = `+${delta}`;
+    deltaEl.classList.remove("hidden");
+    clearTimeout(hudDeltaTimer);
+    hudDeltaTimer = setTimeout(() => deltaEl.classList.add("hidden"), 1200);
+  }
+
+  function updateStats() {
+    const w = app.world;
+    if (!w || !window.LifeHud) return;
+    const a = w.analytics();
+    canvas.style.cursor = app.tool === "inspect" ? "help" : "crosshair";
+    const herbCost = herbCostSafe();
+    const predCost = LIFE_DATA.tools.find((t) => t.id === "pred")?.cost ?? 90;
+    const model = LifeHud.hudModel(w, {
+      gameType: app.gameType,
+      started: app.started,
+      energy: app.energy,
+      budget: app.difficulty?.energy ?? w.arcadeBudget,
+      herbCost,
+      predCost,
+      analytics: a
+    });
+
+    const cycleLabel = app.gameType === "arcade" ? "Циклы" : "Ход";
+    const cycleIco = $("cycle-ico");
+    const cycleVal = $("cycle-val");
+    const cycleName = $("cycle-label");
+    if (cycleIco) cycleIco.textContent = app.gameType === "arcade" ? "⏱" : "🧬";
+    if (cycleVal) cycleVal.textContent = LifeHud.hudNum(model.cycles);
+    if (cycleName) cycleName.textContent = cycleLabel;
+    const cycleBadge = $("cycle-badge");
+    if (cycleBadge) cycleBadge.title = cycleLabel;
+
+    const lifeBadge = $("life-badge");
+    const lifePointsVal = $("life-points-val");
+    if (lifeBadge && lifePointsVal) {
+      if (app.gameType === "arcade") {
+        lifeBadge.classList.remove("hidden");
+        const next = model.score;
+        const prev = app.hudPrev.score || 0;
+        lifePointsVal.textContent = LifeHud.hudNum(next);
+        if (next > prev) {
+          const d = next - prev;
+          flashStat(lifeBadge, "is-up");
+          showScoreDelta(d);
+          if (d >= 8) spawnHudPop(`+${d}`, "score");
+        }
+        app.hudPrev.score = next;
+      } else {
+        lifeBadge.classList.add("hidden");
+      }
+    }
+
+    const energyPill = $("energy-pill-play");
+    if (energyPill) {
+      if (app.gameType === "arcade") {
+        energyPill.classList.remove("hidden");
+        energyPill.classList.remove("band-ok", "band-tight", "band-broke", "band-sandbox");
+        energyPill.classList.add(`band-${model.energyBand}`);
+        const bar = $("hud-energy-bar");
+        if (bar && model.energyRatio != null) bar.style.width = `${Math.round(model.energyRatio * 100)}%`;
+        energyPill.title = model.budget != null
+          ? `⚡ ${LifeHud.hudNum(app.energy)} из ${LifeHud.hudNum(model.budget)}`
+          : `⚡ ${LifeHud.hudNum(app.energy)}`;
+        const prevE = app.hudPrev.energy;
+        if (Number.isFinite(app.energy) && prevE != null && app.energy !== prevE) {
+          const dE = app.energy - prevE;
+          if (dE > 0) {
+            flashStat(energyPill, "is-up");
+            spawnHudPop(`+${Math.round(dE)} ⚡`, "energy");
+          } else if (dE <= -20) {
+            flashStat(energyPill, "is-down");
+          }
+        }
+        app.hudPrev.energy = app.energy;
+      } else {
+        energyPill.classList.add("hidden");
+      }
+    }
+
+    const chainEl = $("hud-chain");
+    if (chainEl) {
+      if (app.gameType === "arcade") {
+        chainEl.classList.remove("hidden");
+        chainEl.classList.toggle("is-locked", model.chain.locked);
+        if (model.chain.locked && !app.hudPrev.chainLocked) {
+          flashStat(chainEl, "is-up");
+          spawnHudPop("Цепочка жива!", "score");
+          toast("Цепочка жива — очки за время", { important: true });
+        }
+        app.hudPrev.chainLocked = model.chain.locked;
+        const bar = $("hud-chain-bar");
+        if (bar) bar.style.width = `${Math.round((model.chain.locked ? 1 : model.chain.ratio) * 100)}%`;
+        const val = $("hud-chain-val");
+        if (val) val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
+      } else {
+        chainEl.classList.add("hidden");
+      }
+    }
+
+    const obj = $("hud-objective");
+    if (obj) {
+      obj.innerHTML = `<small>${model.objective.title}</small>${model.objective.line}`;
+    }
+    const threat = $("hud-threat");
+    if (threat) {
+      if (model.threat) {
+        threat.classList.remove("hidden");
+        threat.className = `hud-threat level-${model.threat.level}`;
+        threat.textContent = model.threat.text;
+      } else if (model.showRoulette) {
+        threat.classList.remove("hidden");
+        threat.className = "hud-threat level-info";
+        threat.textContent = model.rouletteIn === 0 ? "🎰 Рулетка" : `🎰 через ${model.rouletteIn}`;
+      } else {
+        threat.classList.add("hidden");
+        threat.textContent = "";
+      }
+    }
+
+    renderTrophic($("hud-trophic"), model.trophic, a);
+
+    const extraKey = model.trophic.extra.map((s) => `${s.id}${s.value}`).join(",");
+    const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.threat?.text || ""}`;
+    if (statsKey !== app.statsCacheKey) {
+      app.statsCacheKey = statsKey;
+      const grid = $("stats-grid");
+      if (grid) {
+        const rows = [...model.trophic.core, ...model.trophic.extra];
+        grid.innerHTML = rows.map((s) => (
+          `<div class="stat-chip" title="${s.label}">`
+          + `<span class="stat-ico" aria-hidden="true">${s.icon}</span>`
+          + `<span class="stat-label">${s.label}</span>`
+          + `<strong>${s.value}</strong></div>`
+        )).join("");
+      }
+      const live = $("hud-viability");
+      if (live) {
+        live.className = `hud-viability tone-${model.viability.tone}`;
+        const food = model.viability.herbs ? ` · корм ${model.viability.foodPerHerb}` : "";
+        const prey = model.viability.preds ? ` · добыча ${model.viability.preyPerFox}` : "";
+        live.innerHTML = `
+          <div class="row"><span>Мир</span><strong>${model.viability.label} · ${model.viability.score}%</strong></div>
+          <div class="bar"><i style="width:${model.viability.score}%"></i></div>
+          <p class="note">${model.viability.note}${food}${prey}</p>
+          ${model.viability.herbs ? `<div class="meter" style="margin-top:8px;padding:0;background:none"><div class="row"><span>Сытость зайцев</span><strong>${model.viability.herbSat}%</strong></div><div class="bar sat"><i style="width:${model.viability.herbSat}%"></i></div></div>` : ""}
+          ${model.viability.preds ? `<div class="meter" style="margin-top:8px;padding:0;background:none"><div class="row"><span>Сытость лис</span><strong>${model.viability.predSat}%</strong></div><div class="bar sat fox"><i style="width:${model.viability.predSat}%"></i></div></div>` : ""}
+        `;
+      }
+    }
+    renderInspect();
+  }
+
+  function herbCostSafe() {
+    return LIFE_DATA.tools.find((t) => t.id === "herb")?.cost ?? 45;
   }
 
   function setupWorld(gameType, difficulty) {
@@ -513,6 +702,11 @@
     app.statsCacheKey = "";
     app.energyLedger = { spent: 0, earned: 0, upkeep: 0 };
     app.energyHistory = [];
+    app.hudPrev = {
+      score: 0,
+      energy: gameType === "arcade" ? (difficulty?.energy ?? 0) : null,
+      chainLocked: false
+    };
 
     if (gameType === "arcade" && difficulty) {
       app.energy = difficulty.energy;
@@ -551,21 +745,12 @@
     if (gameType === "arcade") {
       $("game-title").textContent = "Аркада";
       $("game-subtitle").textContent = difficulty.label;
-      $("hud-goal-title").textContent = "Цель";
-      $("hud-goal").textContent = `Очки — за живую цепочку. ⚡ ${difficulty.energy} — бюджет на вмешательство, не ферма.`;
-      $("hud-hint").textContent = difficulty.id === "hardcore"
-        ? "В центре уже трава. Держи травоядных 25+ циклов — тогда идут очки за время."
-        : "Без травоядных награды падают. Только хищники + лес — раунд кончится быстро.";
     } else {
       $("game-title").textContent = "Песочница";
       $("game-subtitle").textContent = "Свободный опыт";
-      $("hud-goal-title").textContent = "Эксперимент";
-      $("hud-goal").textContent = "Собери свой лес и посмотри, как всё устроено. Энергии хватит на всё.";
-      $("hud-hint").textContent = "Трава вырастает в куст, потом в дерево. Зайцы деревья не едят.";
     }
 
     renderTools();
-    legend();
     updateEnergy();
     renderInspect();
     $("log").innerHTML = "";
@@ -692,7 +877,7 @@
     const cellKey = `${app.tool}:${x},${y}`;
     if (app.lastPaintCell === cellKey) return;
     if (!canPaint()) {
-      toast("Не хватает энергии");
+      toast("Не хватает энергии", { log: "skip" });
       return;
     }
     const cost = toolCost(app.tool);
@@ -898,79 +1083,19 @@
     ctx.restore();
   }
 
-  function updateStats() {
-    const w = app.world;
-    if (!w) return;
-    const a = w.analytics();
-    canvas.style.cursor = app.tool === "inspect" ? "help" : "crosshair";
-
-    const cycleLabel = app.gameType === "arcade" ? "Циклы" : "Поколение";
-    const cycleIcon = app.gameType === "arcade" ? "⏱" : "🧬";
-    const cycleBadge = $("cycle-badge");
-    const cycleIco = $("cycle-ico");
-    const cycleVal = $("cycle-val");
-    if (cycleBadge) cycleBadge.title = cycleLabel;
-    if (cycleIco) cycleIco.textContent = cycleIcon;
-    if (cycleVal) cycleVal.textContent = w.generation;
-
-    const lifeBadge = $("life-badge");
-    const lifePointsVal = $("life-points-val");
-    if (lifeBadge && lifePointsVal) {
-      if (app.gameType === "arcade") {
-        lifeBadge.classList.remove("hidden");
-        lifePointsVal.textContent = w.lifePoints || 0;
-      } else {
-        lifeBadge.classList.add("hidden");
-      }
-    }
-
-    const stats = [
-      { icon: "🌱", label: "Трава", value: a.grass },
-      { icon: "🌿", label: "Кусты", value: a.bush },
-      { icon: "🌳", label: "Деревья", value: a.tree },
-      { icon: "🐰", label: "Зайцы", value: a.herbs },
-      { icon: "🦊", label: "Лисы", value: a.preds },
-      { icon: "🐻", label: "Медведи", value: a.bears }
-    ];
-    const statsKey = `${w.generation}|${a.score}|${a.label}|${stats.map((s) => s.value).join(",")}|${a.herbSat}|${a.predSat}|${a.note}`;
-    if (statsKey !== app.statsCacheKey) {
-      app.statsCacheKey = statsKey;
-      const grid = $("stats-grid");
-      grid.innerHTML = stats.map((s) => (
-        `<div class="stat-chip" title="${s.label}">`
-        + `<span class="stat-ico" aria-hidden="true">${s.icon}</span>`
-        + `<span class="stat-label">${s.label}</span>`
-        + `<strong>${s.value}</strong></div>`
-      )).join("");
-
-      $("analytics").innerHTML = `
-      <div class="meter">
-        <div class="row"><span>Жизнеспособность</span><strong>${a.label} · ${a.score}%</strong></div>
-        <div class="bar"><i style="width:${a.score}%"></i></div>
-        <p class="note">${a.note}</p>
-      </div>
-      <div class="meter">
-        <div class="row"><span>Сытость зайцев</span><strong>${a.herbs ? a.herbSat + "%" : "нет"}</strong></div>
-        <div class="bar sat"><i style="width:${a.herbs ? a.herbSat : 0}%"></i></div>
-        <p class="note">${a.herbs ? `Голодных: ${a.herbHungry}. Корм: ${a.foodPerHerb} на зайца.` : "—"}</p>
-      </div>
-      <div class="meter">
-        <div class="row"><span>Сытость лис</span><strong>${a.preds ? a.predSat + "%" : "нет"}</strong></div>
-        <div class="bar sat fox"><i style="width:${a.preds ? a.predSat : 0}%"></i></div>
-      </div>
-    `;
-    }
-    renderInspect();
-  }
-
   function renderInspect() {
-    const card = $("inspect-card");
-    if (!app.inspect) {
-      card.classList.add("hidden");
-      return;
+    const html = app.inspect ? describeCell(app.inspect.x, app.inspect.y) : "";
+    const desk = $("inspect-card");
+    const stage = $("inspect-card-stage");
+    const show = !!app.inspect;
+    if (desk) {
+      desk.classList.toggle("hidden", !show);
+      if (show) desk.innerHTML = html;
     }
-    card.classList.remove("hidden");
-    card.innerHTML = describeCell(app.inspect.x, app.inspect.y);
+    if (stage) {
+      stage.classList.toggle("hidden", !show);
+      if (show) stage.innerHTML = html;
+    }
   }
 
   function describeCell(x, y) {

@@ -37,7 +37,7 @@ git merge origin/main
 git status -sb
 ```
 
-Не описывай игру по неоттянутым файлам. Канон: `js/data.js` и `js/engine.js` **после** merge `origin/main`.
+Не описывай игру по неоттянутым файлам. Канон: `js/tables/*` + `js/sim/*` **после** merge `origin/main`.
 
 ## Как крутить версию
 

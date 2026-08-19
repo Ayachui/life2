@@ -7,7 +7,7 @@ const vm = require("vm");
 const sandbox = { Math, window: {} };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, "../js/data.js"), "utf8"), sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "../js/content/roulette.js"), "utf8"), sandbox);
 
 const { rouletteSliceAtPointer, rouletteSpinDegrees, ROULETTE_SLICE_CENTER } = sandbox.window;
 
