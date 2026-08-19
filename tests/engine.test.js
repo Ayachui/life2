@@ -968,3 +968,66 @@ describe("корова и наследование мутантов", () => {
     assert.equal(baby.trait, null);
   });
 });
+
+describe("размножение: зрелость", () => {
+  test("лиса не плодится в цикл появления и охоты", () => {
+    const { world, T } = createWorld();
+    world.generation = 20;
+    world.set(5, 5, T.HERB);
+    const hare = world.makeAgent(5, 5, T.HERB);
+    world.set(7, 5, T.PRED);
+    const fox = world.makeAgent(7, 5, T.PRED);
+    hare.energy = 8;
+    fox.energy = 10;
+    world.agents = [hare, fox];
+    world.stepAgents();
+    const preds = world.agents.filter((a) => !a.dead && a.kind === T.PRED);
+    assert.equal(preds.length, 1, "лиса не должна сразу дать потомство");
+  });
+
+  test("заяц не плодится в цикл появления и кормёжки", () => {
+    const { world, T } = createWorld();
+    world.generation = 30;
+    world.set(5, 5, T.HERB);
+    const hare = world.makeAgent(5, 5, T.HERB);
+    world.setPlant(6, 5, T.STAGE_GRASS, 0);
+    hare.energy = 8;
+    world.agents = [hare];
+    world.stepAgents();
+    const herbs = world.agents.filter((a) => !a.dead && a.kind === T.HERB);
+    assert.equal(herbs.length, 1);
+  });
+
+  test("посаженный зверь получает стартовый кулдаун", () => {
+    const { world, T } = createWorld();
+    world.generation = 5;
+    const fox = world.makeAgent(3, 3, T.PRED);
+    const hare = world.makeAgent(4, 4, T.HERB);
+    assert.ok(fox.cool > 0);
+    assert.ok(hare.cool > 0);
+    assert.equal(fox.bornGen, 5);
+  });
+
+  test("зрелая лиса может размножиться", () => {
+    const { world, T } = createWorld();
+    world.generation = 50;
+    world.set(5, 5, T.PRED);
+    const fox = world.makeAgent(5, 5, T.PRED);
+    fox.bornGen = 20;
+    fox.energy = 20;
+    fox.cool = 0;
+    world.set(6, 5, T.EMPTY);
+    world.set(5, 6, T.EMPTY);
+    world.set(4, 5, T.HERB);
+    world.agents = [fox, world.makeAgent(4, 5, T.HERB)];
+    let bred = false;
+    for (let i = 0; i < 30; i++) {
+      world.stepAgents();
+      if (world.agents.filter((a) => !a.dead && a.kind === T.PRED).length > 1) {
+        bred = true;
+        break;
+      }
+    }
+    assert.ok(bred, "взрослая лиса должна когда-нибудь размножиться");
+  });
+});
