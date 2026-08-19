@@ -18,6 +18,8 @@ const PLANT_CFG = {
   treeBitesCow: 10,
   treeBitesElk: 8,
   treeEnergyPerBite: 0.45,
+  treeEnergyPerBiteCow: 2.0,
+  treeBitesPerTickCow: 3,
   bushToTreeGrass: 2
 };
 
@@ -791,7 +793,11 @@ class World {
       }
     }
 
-    food.sort((a, b) => a.man - b.man);
+    food.sort((a, b) => {
+      const rank = this.herbFoodRank(agent, a.stage) - this.herbFoodRank(agent, b.stage);
+      if (rank !== 0) return rank;
+      return a.man - b.man;
+    });
     prey.sort((a, b) => this.preyPriority(agent, a.agent, px, py) - this.preyPriority(agent, b.agent, px, py));
     threats.sort((a, b) => a.man - b.man);
 
@@ -807,6 +813,18 @@ class World {
   isThreatTo(hunter, victim) {
     if (!hunter || !victim || hunter.dead || victim.dead) return false;
     return this.canHunt(hunter, victim);
+  }
+
+  herbFoodRank(agent, stage) {
+    if (isCow(agent)) {
+      if (stage === STAGE_TREE) return 0;
+      if (stage === STAGE_GRASS) return 1;
+      return 2;
+    }
+    if (isElk(agent) && stage === STAGE_TREE) return 0;
+    if (stage === STAGE_GRASS) return 0;
+    if (stage === STAGE_BUSH) return 1;
+    return 2;
   }
 
   findNearestEdible(x, y, range, metric = "scout", eater = null) {
@@ -838,6 +856,8 @@ class World {
         }
       }
     }
+    if (isCow(eater)) return bestTree || bestGrass || bestBush;
+    if (isElk(eater)) return bestTree || bestGrass || bestBush;
     return bestGrass || bestBush || bestTree;
   }
 
@@ -1436,6 +1456,20 @@ class World {
     return agent;
   }
 
+  inheritSpeciesTrait(baby, parent) {
+    const trait = parent?.trait;
+    if (!trait || trait === TRAIT.KROL || !SPECIES_CFG[trait]) return false;
+    const cfg = SPECIES_CFG[trait];
+    baby.trait = trait;
+    baby.drain = cfg.drain;
+    baby.thresh = cfg.thresh;
+    baby.vision = cfg.vision;
+    baby.hue = parent.hue;
+    baby.moveInterval = cfg.moveInterval || 1;
+    baby.movesPerTick = cfg.movesPerTick || 1;
+    return true;
+  }
+
   applySpeciesTrait(baby, trait, x, y, parent = null) {
     const cfg = SPECIES_CFG[trait];
     if (!cfg) return false;
@@ -1903,10 +1937,14 @@ class World {
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
     } else if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) {
-      const gained = PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
-      this.plantBites[i]--;
-      a.energy += gained;
-      this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
+      const bitesThisTick = isCow(a) ? PLANT_CFG.treeBitesPerTickCow : 1;
+      const perBite = isCow(a) ? PLANT_CFG.treeEnergyPerBiteCow
+        : PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
+      for (let b = 0; b < bitesThisTick && this.plantBites[i] > 0; b++) {
+        this.plantBites[i]--;
+        a.energy += perBite;
+        this.awardProcessedEnergy(perBite, a, this.plantStageTier(stage));
+      }
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         this.spawnGrassAt(meal.x, meal.y);
@@ -2063,8 +2101,10 @@ class World {
             const baby = this.makeAgent(spot.x, spot.y, a.kind, a);
             baby.energy = a.energy;
             baby.cool = a.cool;
-            if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y, a);
-            else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
+            if (!this.inheritSpeciesTrait(baby, a)) {
+              if (baby.kind === HERB) this.tryHerbSpeciesMutation(baby, spot.x, spot.y, a);
+              else if (baby.kind === PRED) this.tryPredSpeciesMutation(baby, spot.x, spot.y);
+            }
             if (!isKrolDushegub(baby)) this.set(spot.x, spot.y, a.kind);
             babies.push(baby);
             if (!baby.trait) this.awardBirthPoints(baby);
