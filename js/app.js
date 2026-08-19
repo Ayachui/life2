@@ -211,13 +211,6 @@
     return { x: (Math.random() - 0.5) * mag * 2, y: (Math.random() - 0.5) * mag * 2 };
   }
 
-  const ROULETTE_SPIN_DEG = {
-    earthquake: 2025,
-    flood: 2250,
-    plague: 2475,
-    evolution: 2700
-  };
-
   function openRouletteOverlay() {
     if (isRouletteOpen() || !app.world?.roulettePending) return;
     app.rouletteResume = app.playing;
@@ -249,9 +242,10 @@
     spinBtn.disabled = true;
     wheel.classList.remove("spinning");
     void wheel.offsetWidth;
-    const base = ROULETTE_SPIN_DEG[event] || 2160;
-    const extra = Math.floor(Math.random() * 360);
-    wheel.style.setProperty("--spin-deg", `${base + extra}deg`);
+    const spinDeg = typeof rouletteSpinDegrees === "function"
+      ? rouletteSpinDegrees(event)
+      : 2160;
+    wheel.style.setProperty("--spin-deg", `${spinDeg}deg`);
     wheel.classList.add("spinning");
     LifeSound.play("ui");
     setTimeout(() => {
@@ -706,8 +700,39 @@
         : d.kind === LIFE_TYPES.PRED ? "rgba(200,168,106,0.12)" : "rgba(120,200,100,0.1)";
       ctx.fill();
       ctx.globalAlpha = 1;
-      drawEmoji("🦴", d.x, d.y, s, 0.7 + 0.3 * pulse, 0.85);
+      drawEmojiInCell("🦴", d.x, d.y, s, 0.7 + 0.3 * pulse, 0.85);
     }
+  }
+
+  function drawFxParticle(p, s) {
+    const span = p.krol ? 2 : 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(p.x * s, p.y * s, span * s, span * s);
+    ctx.clip();
+    ctx.globalAlpha = p.t;
+    if (p.bone) {
+      drawEmoji("🦴", p.x, p.y, s, p.t, 1.1);
+    } else if (p.krol) {
+      const cx = (p.x + 0.5) * s;
+      const cy = (p.y + 0.5) * s;
+      const pulse = 0.45 + (2.4 - p.t) * 0.55;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, s * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(224,64,251,0.18)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, s * pulse * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc((p.x + 0.5) * s, (p.y + 0.5) * s, s * 0.35 * p.t, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   function draw() {
@@ -759,7 +784,9 @@
             drawEmoji("💧", x, y, s, 0.95);
           }
         } else if (t === T.PLANT) {
-          drawEmoji(w.stageEmoji(x, y), x, y, s);
+          ctx.fillStyle = w.dish && w.inDish(x, y) ? "#0d2430" : "#08151d";
+          ctx.fillRect(x * s, y * s, s, s);
+          drawEmojiInCell(w.stageEmoji(x, y), x, y, s);
         }
       }
     }
@@ -771,13 +798,13 @@
       const scale = a.trait === "корова" ? 1.05
         : a.trait === "лось" ? 1.02
         : 0.88 + 0.1 * sat;
-      drawEmoji(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
+      drawEmojiInCell(icon, a.x, a.y, s, 0.45 + 0.55 * sat, scale);
     }
 
     for (const a of w.agents) {
       if (a.dead || a.trait !== "крол-душегуб") continue;
       const sat = Math.min(1, a.energy / Math.max(0.2, a.thresh || 11));
-      drawSpanEmoji(agentIcon(a), a.x, a.y, 2, s, 0.45 + 0.55 * sat);
+      drawSpanEmojiInCell(agentIcon(a), a.x, a.y, 2, s, 0.45 + 0.55 * sat);
     }
 
     if (app.inspect) {
@@ -791,31 +818,7 @@
       }
     }
 
-    for (const p of w.fx) {
-      ctx.globalAlpha = p.t;
-      if (p.bone) {
-        drawEmoji("🦴", p.x, p.y, s, p.t, 1.1);
-      } else if (p.krol) {
-        const cx = (p.x + 0.5) * s;
-        const cy = (p.y + 0.5) * s;
-        const pulse = 0.45 + (2.4 - p.t) * 0.55;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(224,64,251,0.18)";
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * pulse * 0.65, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc((p.x + 0.5) * s, (p.y + 0.5) * s, s * 0.35 * p.t, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
+    for (const p of w.fx) drawFxParticle(p, s);
     ctx.restore();
     updatePlagueFog();
   }
@@ -835,6 +838,15 @@
     ctx.restore();
   }
 
+  function drawSpanEmojiInCell(emoji, x, y, span, s, alpha = 1) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x * s, y * s, span * s, span * s);
+    ctx.clip();
+    drawSpanEmoji(emoji, x, y, span, s, alpha);
+    ctx.restore();
+  }
+
   function drawEmoji(emoji, x, y, s, alpha = 1, scale = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -842,6 +854,15 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(emoji, (x + 0.5) * s, (y + 0.55) * s);
+    ctx.restore();
+  }
+
+  function drawEmojiInCell(emoji, x, y, s, alpha = 1, scale = 1) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x * s, y * s, s, s);
+    ctx.clip();
+    drawEmoji(emoji, x, y, s, alpha, scale);
     ctx.restore();
   }
 
