@@ -211,6 +211,15 @@
     return { x: (Math.random() - 0.5) * mag * 2, y: (Math.random() - 0.5) * mag * 2 };
   }
 
+  function resetRouletteWheel() {
+    const wheel = $("roulette-wheel");
+    wheel.classList.remove("spinning");
+    wheel.style.transition = "none";
+    wheel.style.transform = "rotate(0deg)";
+    void wheel.offsetWidth;
+    wheel.style.transition = "";
+  }
+
   function openRouletteOverlay() {
     if (isRouletteOpen() || !app.world?.roulettePending) return;
     app.rouletteResume = app.playing;
@@ -218,9 +227,7 @@
     $("btn-play").textContent = "▶ Старт";
     $("roulette-result").classList.add("hidden");
     $("roulette-spin").disabled = false;
-    const wheel = $("roulette-wheel");
-    wheel.classList.remove("spinning");
-    wheel.style.transform = "";
+    resetRouletteWheel();
     $("roulette-overlay").classList.remove("hidden");
   }
 
@@ -240,15 +247,19 @@
     const wheel = $("roulette-wheel");
     const spinBtn = $("roulette-spin");
     spinBtn.disabled = true;
-    wheel.classList.remove("spinning");
-    void wheel.offsetWidth;
     const spinDeg = typeof rouletteSpinDegrees === "function"
       ? rouletteSpinDegrees(event)
       : 2160;
+    resetRouletteWheel();
     wheel.style.setProperty("--spin-deg", `${spinDeg}deg`);
     wheel.classList.add("spinning");
     LifeSound.play("ui");
     setTimeout(() => {
+      wheel.classList.remove("spinning");
+      wheel.style.transition = "none";
+      wheel.style.transform = `rotate(${spinDeg}deg)`;
+      void wheel.offsetWidth;
+      wheel.style.transition = "";
       const result = app.world.applyRouletteEvent(event);
       flushWorldSounds(app.world);
       const resultEl = $("roulette-result");
