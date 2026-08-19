@@ -87,4 +87,33 @@ describe("коала: поведение и ⚡", () => {
     world.feedHungryKoala(koala);
     assert.ok(world.pendingEnergy >= 1, "ожидали ⚡ за укус с дерева");
   });
+
+  test("на дереве ест даже если лиса рядом", () => {
+    const { world, T } = createWorld(16, 16);
+    world.setPlant(8, 8, T.STAGE_TREE, 0);
+    const koala = makeKoala(world, 8, 8, T, { energy: 8, thresh: 14 });
+    world.set(10, 8, T.PRED);
+    const fox = world.makeAgent(10, 8, T.PRED);
+    fox.energy = 12;
+    world.agents.push(fox);
+    const before = koala.energy;
+    world.feedHungryKoala(koala);
+    assert.ok(koala.energy > before, "коала на дереве должна есть при угрозе");
+  });
+
+  test("голодная коала не глохнет на дереве за 40 ходов", () => {
+    const { world, T } = createWorld(16, 16);
+    world.setPlant(8, 8, T.STAGE_TREE, 0);
+    world.set(10, 8, T.PRED);
+    const fox = world.makeAgent(10, 8, T.PRED);
+    fox.energy = 12;
+    world.agents.push(fox);
+    const koala = makeKoala(world, 8, 8, T, { energy: 12, thresh: 14 });
+    for (let i = 0; i < 40; i++) {
+      koala.energy -= koala.drain;
+      world.feedHungryKoala(koala);
+    }
+    assert.ok(koala.energy > 0, `коала умерла бы от голода: ${koala.energy}`);
+    assert.ok(koala.energy >= koala.thresh * 0.5, "коала должна оставаться более-менее сытой");
+  });
 });

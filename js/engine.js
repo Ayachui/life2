@@ -1378,9 +1378,11 @@ class World {
 
   feedHungryKoala(a) {
     const aware = this.perceive(a);
+    const hidden = this.koalaHidden(a);
 
-    if (aware.threats.length) {
-      const hide = this.findNearestThicket(a.x, a.y, a.vision || 8, true);
+    if (aware.threats.length && !hidden) {
+      const hide = this.findNearestEmptyPerch(a.x, a.y, a.vision || 8)
+        || this.findNearestThicket(a.x, a.y, a.vision || 8, true);
       if (hide) {
         this.nudgeToward(a, hide.x, hide.y);
         return;
@@ -1392,15 +1394,6 @@ class World {
       }
     }
 
-    if (!koalaPerchedOn(this, a)) {
-      const perch = this.findNearestEmptyPerch(a.x, a.y, a.vision || 8)
-        || this.findNearestThicket(a.x, a.y, a.vision || 8, true);
-      if (perch) {
-        this.nudgeToward(a, perch.x, perch.y);
-        return;
-      }
-    }
-
     const continuing = this.mealFromEating(a);
     if (continuing) {
       this.eatPlant(a, continuing);
@@ -1408,16 +1401,31 @@ class World {
     }
     if (a.eating) a.eating = null;
 
-    if (koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_TREE) {
-      this.startEating(a, { x: a.x, y: a.y, stage: STAGE_TREE });
+    if (koalaPerchedOn(this, a)) {
+      const stage = this.plantStageAt(a.x, a.y);
+      if (stage === STAGE_TREE || stage === STAGE_BUSH) {
+        this.startEating(a, { x: a.x, y: a.y, stage });
+        return;
+      }
+    }
+
+    const touchTree = aware.food.find((f) => f.stage === STAGE_TREE && f.dist <= 1);
+    if (touchTree) {
+      this.startEating(a, touchTree);
       return;
+    }
+
+    if (!koalaPerchedOn(this, a)) {
+      const perch = this.findNearestEmptyPerch(a.x, a.y, a.vision || 8);
+      if (perch) {
+        this.nudgeToward(a, perch.x, perch.y);
+        return;
+      }
     }
 
     if (aware.touchFood) {
       const food = aware.touchFood;
-      const onTree = koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_TREE;
-      const onBush = koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_BUSH;
-      if ((food.stage === STAGE_TREE && onTree) || (food.stage === STAGE_BUSH && onBush)) {
+      if (food.stage === STAGE_BUSH && koalaPerchedOn(this, a) && this.plantStageAt(a.x, a.y) === STAGE_BUSH) {
         this.startEating(a, food);
         return;
       }
