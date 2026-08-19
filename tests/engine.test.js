@@ -1083,6 +1083,82 @@ describe("размножение: зрелость", () => {
   });
 });
 
+describe("коала", () => {
+  test("ходит по дереву, не уничтожая его", () => {
+    const { world, T } = createWorld();
+    const koala = world.makeAgent(5, 5, T.HERB);
+    world.applySpeciesTrait(koala, "коала", 5, 5);
+    world.setPlant(6, 5, T.STAGE_TREE, 0);
+    world.agents = [koala];
+    assert.ok(world.canAgentMoveTo(koala, 6, 5));
+    world.moveAgentTo(koala, 6, 5);
+    assert.equal(koala.x, 6);
+    assert.equal(world.get(6, 5), T.PLANT);
+    assert.equal(world.plantStageAt(6, 5), T.STAGE_TREE);
+  });
+
+  test("грызёт дерево, не убивая его", () => {
+    const { world, T } = createWorld();
+    const koala = world.makeAgent(6, 5, T.HERB);
+    world.applySpeciesTrait(koala, "коала", 6, 5);
+    koala.energy = 1;
+    koala.thresh = 99;
+    world.setPlant(6, 5, T.STAGE_TREE, 0);
+    world.agents = [koala];
+    world.feedHungryKoala(koala);
+    assert.equal(world.get(6, 5), T.PLANT);
+    assert.equal(world.plantStageAt(6, 5), T.STAGE_TREE);
+    assert.ok(koala.energy > 1);
+  });
+
+  test("в чаще почти невидима для волка", () => {
+    const { world, T } = createWorld();
+    world.setPlant(8, 5, T.STAGE_TREE, 0);
+    const koala = world.makeAgent(8, 5, T.HERB);
+    world.applySpeciesTrait(koala, "коала", 8, 5);
+    world.moveAgentTo(koala, 8, 5);
+    const wolf = world.makeAgent(5, 5, T.PRED);
+    world.applySpeciesTrait(wolf, "волк", 5, 5);
+    world.agents = [koala, wolf];
+    assert.equal(world.findNearestPrey(5, 5, 12, wolf), null);
+    world.set(6, 5, T.EMPTY);
+    world.moveAgentTo(koala, 6, 5);
+    const near = world.findNearestPrey(5, 5, 12, wolf);
+    assert.ok(near);
+    assert.equal(near.x, 6);
+  });
+
+  test("потомство коалы даёт очки жизни", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.set(4, 4, T.HERB);
+    const parent = world.makeAgent(4, 4, T.HERB);
+    world.applySpeciesTrait(parent, "коала", 4, 4);
+    const baby = world.makeAgent(5, 4, T.HERB, parent);
+    world.inheritSpeciesTrait(baby, parent);
+    world.agents = [parent, world.makeAgent(6, 4, T.HERB)];
+    const before = world.lifePoints;
+    world.awardBirthPoints(baby);
+    assert.ok(world.lifePoints > before);
+    assert.equal(baby.trait, "коала");
+  });
+
+  test("коала даёт больше очков за рождение, чем заяц", () => {
+    const { world, T } = createWorld();
+    world.arcade = true;
+    world.set(3, 3, T.HERB);
+    world.set(4, 3, T.HERB);
+    const rabbit = world.makeAgent(3, 3, T.HERB);
+    const koala = world.makeAgent(4, 3, T.HERB);
+    world.applySpeciesTrait(koala, "коала", 4, 3);
+    world.agents = [rabbit, world.makeAgent(5, 3, T.HERB)];
+    world.awardBirthPoints(rabbit);
+    const rabbitPts = world.lifePoints;
+    world.awardBirthPoints(koala);
+    assert.ok(world.lifePoints > rabbitPts, "коала должна давать больше очков, чем заяц");
+  });
+});
+
 describe("грибы", () => {
   test("корова сажает гриб на соседнюю пустую клетку", () => {
     const { world, T } = createWorld();

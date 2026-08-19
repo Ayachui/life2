@@ -971,6 +971,7 @@
       const vision = w.effectiveVision ? w.effectiveVision(a) : a.vision;
       const moveNote = a.kind === T.BEAR ? "медленный, не размножается"
         : a.trait === "корова" ? `медленный (×4), восприятие ${vision} кл.`
+        : a.trait === "коала" ? `висит на деревьях, прячется в чаще, восприятие ${vision} кл.`
         : a.trait === "крол-душегуб" ? `2×2, зона разрушения 4×4, ×6 действий/цикл, восприятие ${vision} кл.`
         : a.trait === "волк" ? `одиночка, восприятие ${vision} кл.`
         : `восприятие ${vision} кл.`;
@@ -987,7 +988,7 @@
         return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.bushToTree} тиков. Укусов: ${w.plantBites[i]}. До дерева ~${Math.max(0, left)}. Сеет траву рядом.`;
       }
       if (w.plantStage[i] === T.STAGE_TREE) {
-        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Едят корова (10 ук.) и лось (8 ук.). После гибели — 1 трава.`;
+        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Едят корова, лось и коала (не убивая). После гибели — 1 трава.`;
       }
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;
