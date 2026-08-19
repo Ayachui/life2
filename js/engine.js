@@ -533,9 +533,29 @@ class World {
     }
   }
 
+  herbivoreCount() {
+    return this.live(HERB).length;
+  }
+
+  /** Пассивные награды от растений — только при живых травоядных. */
+  ecosystemRewardMul() {
+    return this.herbivoreCount() > 0 ? 1 : 0;
+  }
+
   plantRenewalMul() {
-    if (this.hasAnimals()) return 1;
-    return Math.max(0, 1 - this.noAnimalGens / NO_ANIMAL_RENEWAL_GENS);
+    if (this.herbivoreCount() > 0) return 1;
+    return Math.max(0, 1 - this.noHerbGens / NO_ANIMAL_RENEWAL_GENS);
+  }
+
+  awardPlantLifePoints(amount) {
+    const mul = this.ecosystemRewardMul();
+    if (!mul || !amount) return;
+    this.awardLifePoints(amount);
+  }
+
+  grantPlantArcadeEnergy(key) {
+    if (!this.ecosystemRewardMul()) return 0;
+    return this.grantArcadeEnergy(key);
   }
 
   checkArcadeEnd(energy, herbCost) {
@@ -1374,7 +1394,7 @@ class World {
   }
 
   grantEvolutionEnergy() {
-    return this.grantArcadeEnergy("plantEvolveBush");
+    return this.grantPlantArcadeEnergy("plantEvolveBush");
   }
 
   tryHerbSpeciesMutation(baby, x, y, parent = null) {
@@ -1578,8 +1598,8 @@ class World {
     this.births++;
     this.spark(x, y, "#5dff8a");
     this.chime("sprout");
-    this.awardLifePoints(this.pointsFor("plant", "sprout"));
-    this.grantArcadeEnergy("plantSprout");
+    this.awardPlantLifePoints(this.pointsFor("plant", "sprout"));
+    this.grantPlantArcadeEnergy("plantSprout");
     return true;
   }
 
@@ -1598,8 +1618,8 @@ class World {
           this.setPlant(x, y, STAGE_BUSH, 0);
           this.spark(x, y, "#46d070");
           this.chime("evolve_bush");
-          this.awardLifePoints(this.pointsFor("plant", "evolveGrass"));
-          this.grantArcadeEnergy("plantEvolveGrass");
+          this.awardPlantLifePoints(this.pointsFor("plant", "evolveGrass"));
+          this.grantPlantArcadeEnergy("plantEvolveGrass");
         } else if (stage === STAGE_BUSH) {
           if (this.plantAge[i] >= PLANT_CFG.bushToTree) {
             this.setPlant(x, y, STAGE_TREE, 0);
@@ -1607,7 +1627,7 @@ class World {
             this.grantEvolutionEnergy();
             this.spark(x, y, "#2a9e50");
             this.chime("evolve_tree");
-            this.awardLifePoints(this.pointsFor("plant", "evolveBush"));
+            this.awardPlantLifePoints(this.pointsFor("plant", "evolveBush"));
           } else {
             const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
             for (const [dx, dy] of dirs) {
@@ -1626,8 +1646,8 @@ class World {
           this.clearPlant(x, y);
           this.spawnGrassAt(x, y);
           this.chime("wilt");
-          this.awardLifePoints(this.pointsFor("plant", "wilt"));
-          this.grantArcadeEnergy("plantWilt");
+          this.awardPlantLifePoints(this.pointsFor("plant", "wilt"));
+          this.grantPlantArcadeEnergy("plantWilt");
         }
       }
     }

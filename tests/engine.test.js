@@ -184,9 +184,15 @@ describe("эволюция кустов", () => {
 });
 
 describe("энергия за эволюцию", () => {
+  function withHerb(world, T, x = 5, y = 6) {
+    world.set(x, y, T.HERB);
+    world.agents = [world.makeAgent(x, y, T.HERB)];
+  }
+
   test("куст → дерево даёт ⚡ в аркаде", () => {
     const { world, T, PLANT_CFG, LIFE_DATA } = createWorld();
     world.arcade = true;
+    withHerb(world, T);
     world.setPlant(5, 5, T.STAGE_BUSH, PLANT_CFG.bushToTree - 1);
     world.step();
     assert.equal(world.plantStageAt(5, 5), T.STAGE_TREE);
@@ -196,6 +202,7 @@ describe("энергия за эволюцию", () => {
   test("полный цикл трава → куст → дерево даёт ⚡", () => {
     const { world, T, PLANT_CFG, LIFE_DATA } = createWorld();
     world.arcade = true;
+    withHerb(world, T, 3, 4);
     world.setPlant(3, 3, T.STAGE_GRASS, PLANT_CFG.grassToBush - 1);
     world.step();
     assert.equal(world.plantStageAt(3, 3), T.STAGE_BUSH);
@@ -600,10 +607,27 @@ describe("размещение животных", () => {
 });
 
 describe("лес без зверей", () => {
-  test("прорастание падает без животных", () => {
+  test("прорастание падает без травоядных", () => {
     const { world } = createWorld();
-    world.noAnimalGens = 90;
+    world.noHerbGens = 90;
     assert.equal(world.plantRenewalMul(), 0);
+  });
+
+  test("медведь без травоядных не удерживает полный рост леса", () => {
+    const { world, T } = createWorld();
+    const bear = world.makeAgent(5, 5, T.BEAR);
+    world.agents = [bear];
+    world.noHerbGens = 45;
+    assert.ok(world.plantRenewalMul() < 1);
+    assert.equal(world.ecosystemRewardMul(), 0);
+  });
+
+  test("растения не дают энергию без травоядных", () => {
+    const { world, T, PLANT_CFG } = createWorld();
+    world.arcade = true;
+    world.setPlant(4, 4, T.STAGE_BUSH, PLANT_CFG.bushToTree - 1);
+    world.step();
+    assert.equal(world.pendingEnergy, 0);
   });
 });
 
@@ -689,6 +713,8 @@ describe("очки жизни", () => {
   test("эволюция растений даёт очки", () => {
     const { world, T } = createWorld();
     world.arcade = true;
+    world.set(2, 3, T.HERB);
+    world.agents = [world.makeAgent(2, 3, T.HERB)];
     world.setPlant(2, 2, T.STAGE_GRASS, 0);
     world.plantAge[world.idx(2, 2)] = 10;
     world.growPlants();
@@ -732,6 +758,8 @@ describe("аркада: энергия за действия", () => {
   test("эволюция растений даёт ⚡", () => {
     const { world, T, LIFE_DATA, PLANT_CFG } = createWorld();
     world.arcade = true;
+    world.set(2, 3, T.HERB);
+    world.agents = [world.makeAgent(2, 3, T.HERB)];
     world.setPlant(2, 2, T.STAGE_GRASS, 0);
     world.plantAge[world.idx(2, 2)] = PLANT_CFG.grassToBush;
     world.growPlants();

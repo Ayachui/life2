@@ -81,8 +81,7 @@ describe("баланс: пассивный доход ⚡", () => {
       if (totalEnergy > peak) peak = totalEnergy;
     }
 
-    assert.ok(peak <= 50, `за 80 циклов ожидали ≤50 ⚡, пик ${peak}`);
-    assert.ok(peak >= 1, "хотя бы одно дерево должно созреть");
+    assert.equal(peak, 0, "без травоядных лес не даёт ⚡");
   });
 });
 

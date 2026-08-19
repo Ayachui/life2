@@ -603,6 +603,9 @@
       fillRoundRect(dr.x, dr.y, dr.w, dr.h, dr.radius);
       ctx.fillStyle = "#0d2430";
       ctx.fill();
+      ctx.strokeStyle = "rgba(180, 230, 255, 0.35)";
+      ctx.lineWidth = Math.max(3, s * 0.14);
+      ctx.stroke();
     }
 
     drawDecays(w, s);
@@ -662,14 +665,6 @@
       } else {
         ctx.strokeRect(app.inspect.x * s + 1, app.inspect.y * s + 1, s - 2, s - 2);
       }
-    }
-
-    if (w.dish) {
-      const dr = dishRect(w.dish, s);
-      fillRoundRect(dr.x, dr.y, dr.w, dr.h, dr.radius);
-      ctx.strokeStyle = "rgba(180, 230, 255, 0.35)";
-      ctx.lineWidth = Math.max(3, s * 0.14);
-      ctx.stroke();
     }
 
     for (const p of w.fx) {
