@@ -8,7 +8,11 @@ const {
   validatePoints,
   buildEntry,
   packMember,
-  unpackScores
+  unpackScores,
+  groupScores,
+  normalizeDifficulty,
+  keyForDifficulty,
+  emptyGrouped
 } = require("../api/leaderboard-lib");
 
 describe("лидерборд API", () => {
@@ -64,5 +68,26 @@ describe("лидерборд API", () => {
     assert.equal(scores[0].name, "Облако");
     assert.equal(scores[0].points, 777);
     assert.equal(scores[0].cycles, 77);
+  });
+
+  test("groupScores раскладывает записи по сложности", () => {
+    const grouped = groupScores([
+      { name: "A", points: 100, cycles: 10, difficulty: "easy" },
+      { name: "B", points: 200, cycles: 20, difficulty: "hard" },
+      { name: "C", points: 150, cycles: 15, difficulty: "easy" },
+      { name: "D", points: 50, cycles: 5 }
+    ]);
+    assert.equal(grouped.easy.length, 2);
+    assert.equal(grouped.easy[0].name, "C");
+    assert.equal(grouped.hard[0].name, "B");
+    assert.equal(grouped.medium[0].name, "D");
+    assert.equal(grouped.hardcore.length, 0);
+  });
+
+  test("normalizeDifficulty и ключи Redis", () => {
+    assert.equal(normalizeDifficulty("hardcore"), "hardcore");
+    assert.equal(normalizeDifficulty("unknown"), "medium");
+    assert.equal(keyForDifficulty("hard"), "life:arcade:leaderboard-v3:hard");
+    assert.deepEqual(Object.keys(emptyGrouped()), ["easy", "medium", "hard", "hardcore"]);
   });
 });

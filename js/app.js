@@ -21,7 +21,8 @@
     inspect: null,
     gameEnded: false,
     krolResumePlaying: false,
-    resumeGameOverAfterModal: false
+    resumeGameOverAfterModal: false,
+    lbTab: "easy"
   };
 
   const canvas = $("world");
@@ -848,17 +849,44 @@
     if (btn) btn.textContent = app.speedLabels[app.speed] || app.speedLabels[0];
   }
 
+  function renderLeaderboardRows(scores) {
+    if (!scores?.length) {
+      return '<tr><td colspan="4" class="empty-lb">Пока пусто — сыграй на этом уровне!</td></tr>';
+    }
+    return scores.map((s, i) => {
+      const pts = s.points ?? s.cycles ?? 0;
+      const cycles = s.cycles ?? 0;
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${pts}</td><td>${cycles}</td><td>${s.date || ""}</td></tr>`;
+    }).join("");
+  }
+
+  function renderLeaderboardTabs(activeId) {
+    return LIFE_DATA.difficulties.map((d) => (
+      `<button type="button" class="lb-tab${d.id === activeId ? " active" : ""}" data-lb-tab="${d.id}">${d.emoji} ${d.label}</button>`
+    )).join("");
+  }
+
+  function bindLeaderboardTabs(scores, activeId) {
+    const tbody = $("lb-tbody");
+    const update = (tabId) => {
+      app.lbTab = tabId;
+      document.querySelectorAll(".lb-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lbTab === tabId);
+      });
+      if (tbody) tbody.innerHTML = renderLeaderboardRows(scores[tabId] || []);
+    };
+    document.querySelectorAll(".lb-tab").forEach((btn) => {
+      btn.onclick = () => update(btn.dataset.lbTab);
+    });
+    update(activeId);
+  }
+
   async function showLeaderboard(resumeGameOver = false) {
     app.resumeGameOverAfterModal = resumeGameOver;
     const { scores, source } = await LifeLeaderboard.fetchScores();
-    const rows = scores.length
-      ? scores.map((s, i) => {
-          const diff = LifeLeaderboard.DIFF_LABELS[s.difficulty] || s.difficulty || "—";
-          const pts = s.points ?? s.cycles ?? 0;
-          const cycles = s.cycles ?? 0;
-          return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${pts}</td><td>${cycles}</td><td>${diff}</td><td>${s.date || ""}</td></tr>`;
-        }).join("")
-      : '<tr><td colspan="6" class="empty-lb">Пока пусто — сыграй в аркаду!</td></tr>';
+    const activeTab = app.difficulty?.id && LifeLeaderboard.DIFFICULTIES.includes(app.difficulty.id)
+      ? app.difficulty.id
+      : (app.lbTab || "easy");
 
     const note = source === "local"
       ? '<p class="lb-note">Показаны записи только с этого устройства. Общая таблица появится, когда сервер подключён.</p>'
@@ -867,12 +895,15 @@
     openModal(`
       <h3>🏆 Таблица лидеров</h3>
       ${note}
+      <div class="lb-tabs" role="tablist">${renderLeaderboardTabs(activeTab)}</div>
       <table class="lb-table">
-        <thead><tr><th>#</th><th>Имя</th><th>Очки</th><th>Циклы</th><th>Сложность</th><th>Дата</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead><tr><th>#</th><th>Имя</th><th>Очки</th><th>Циклы</th><th>Дата</th></tr></thead>
+        <tbody id="lb-tbody">${renderLeaderboardRows(scores[activeTab] || [])}</tbody>
       </table>
       <div class="modal-actions"><button class="btn primary" type="button" id="lb-close">Закрыть</button></div>
     `, true);
+
+    bindLeaderboardTabs(scores, activeTab);
   }
 
   function escapeHtml(s) {
