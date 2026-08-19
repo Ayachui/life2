@@ -43,10 +43,10 @@ describe("debug-lib", () => {
 });
 
 describe("LIFE_BALANCE snapshot", () => {
-  test("версия 0.13.1", () => {
+  test("версия 0.13.2", () => {
     const { LIFE_BALANCE } = createWorld();
     assert.equal(LIFE_BALANCE.version.minor, 13);
-    assert.equal(LIFE_BALANCE.version.patch, 1);
+    assert.equal(LIFE_BALANCE.version.patch, 2);
     assert.equal(LIFE_BALANCE.tools.herb, 45);
     assert.equal(LIFE_BALANCE.plants.treeLife, 113);
     assert.equal(LIFE_BALANCE.arcadeEnergy.hunt, 0);

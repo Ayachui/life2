@@ -292,6 +292,7 @@ input[type="range"] { width: 100%; accent-color: var(--mint); }
   height: 100%;
   border-radius: 50%;
   border: 4px solid rgba(255, 193, 77, 0.55);
+  transform-origin: 50% 50%;
   background: conic-gradient(
     from 0deg at 50% 50%,
     #b84a22 0deg 90deg,
