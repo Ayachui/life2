@@ -105,21 +105,6 @@ function hudChain(world) {
   };
 }
 
-function hudEra(world) {
-  const need = hudBalance().arcadeEnd?.eraAfterChain ?? 0;
-  if (!need || !world?.sustainedChain) return null;
-  const lock = world.chainLockGen != null ? world.chainLockGen : (world.generation || 0);
-  const used = Math.max(0, (world.generation || 0) - lock);
-  const left = Math.max(0, need - used);
-  return {
-    used,
-    need,
-    left,
-    ratio: need ? Math.min(1, used / need) : 0,
-    late: left <= 40
-  };
-}
-
 function hudRouletteEta(world) {
   const interval = hudBalance().roulette?.interval ?? 100;
   const g = world.generation || 0;
@@ -142,23 +127,13 @@ function hudObjective(world, meta = {}) {
   }
   const chain = hudChain(world);
   if (!chain.locked) {
-    return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроется эра и пирамида ⚡.` };
+    return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроются медведь и пирамида ⚡.` };
   }
-  const era = hudEra(world);
   const baseCap = hudBalance().arcadeEconomy?.pulseCap ?? 90;
   const apexCap = hudBalance().arcadeEconomy?.pulseCapApex ?? 175;
   const c = world?.counts?.() || {};
   const hasPred = (c.preds || 0) > 0;
   const cap = hasPred ? apexCap : baseCap;
-  if (era) {
-    const late = era.left <= 40;
-    return {
-      title: late ? "Финал эры" : "Эра эксперимента",
-      line: hasPred
-        ? `⚡ до ${cap}. Осталось ${era.left} циклов — максимум очков. Рулетка каждые 100.`
-        : `⚡ до ${baseCap}. ≥4 зайца → лиса → cap ${apexCap}. Эра: ${era.left} циклов.`
-    };
-  }
   return {
     title: "Цепочка жива",
     line: hasPred
@@ -183,7 +158,6 @@ function hudModel(world, meta = {}) {
   const energy = meta.energy;
   const budget = meta.budget ?? world?.arcadeBudget ?? null;
   const chain = world ? hudChain(world) : { current: 0, need: 25, locked: false, ratio: 0 };
-  const era = world ? hudEra(world) : null;
   const threat = world ? hudThreat(world, { ...meta, herbCost }) : null;
   const rouletteIn = world ? hudRouletteEta(world) : 100;
   return {
@@ -195,7 +169,6 @@ function hudModel(world, meta = {}) {
     energyBand: hudEnergyBand(energy, herbCost, predCost, plantCost),
     energyRatio: Number.isFinite(energy) && budget ? Math.min(1, energy / Math.max(1, budget)) : null,
     chain,
-    era,
     threat,
     objective: hudObjective(world, { ...meta, note: an.note }),
     viability: {
@@ -218,14 +191,14 @@ function hudModel(world, meta = {}) {
 
 if (typeof window !== "undefined") {
   window.LifeHud = {
-    hudNum, hudEnergyBand, hudSpecials, hudTrophic, hudThreat, hudChain, hudEra,
+    hudNum, hudEnergyBand, hudSpecials, hudTrophic, hudThreat, hudChain,
     hudRouletteEta, hudObjective, hudViabilityTone, hudModel
   };
 }
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    hudNum, hudEnergyBand, hudSpecials, hudTrophic, hudThreat, hudChain, hudEra,
+    hudNum, hudEnergyBand, hudSpecials, hudTrophic, hudThreat, hudChain,
     hudRouletteEta, hudObjective, hudViabilityTone, hudModel
   };
 }

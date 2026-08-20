@@ -30,7 +30,7 @@ function runReport() {
     maxGens: 400
   });
 
-  console.log("Playtest / economy (Alpha 0.16.0)");
+  console.log("Playtest / economy (Alpha 0.17.0)");
   console.table(rows.map((r) => ({
     diff: r.diff,
     strategy: r.strategy,

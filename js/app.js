@@ -146,7 +146,6 @@
     $("modal").classList.remove("hidden");
   }
   function arcadeOverTitle(reason) {
-    if (reason === "era_complete") return "Эксперимент завершён";
     if (reason === "no_chain") return "Лесу не хватило живых зверей";
     return "Экосистема остановилась";
   }
@@ -633,34 +632,23 @@
       if (app.gameType === "arcade") {
         chainEl.classList.remove("hidden");
         chainEl.classList.toggle("is-locked", model.chain.locked);
-        chainEl.classList.remove("is-era", "is-era-late");
-        if (model.era) {
-          chainEl.classList.add("is-era");
-          if (model.era.late) chainEl.classList.add("is-era-late");
-        }
         if (model.chain.locked && !app.hudPrev.chainLocked) {
           flashStat(chainEl, "is-up");
           spawnHudPop("Цепочка жива!", "score");
-          toast("Цепочка жива — эра началась: построй пирамиду и копи ⚡", { important: true });
+          toast("Цепочка жива — строй пирамиду и копи ⚡", { important: true });
         }
         app.hudPrev.chainLocked = model.chain.locked;
         const bar = $("hud-chain-bar");
         if (bar) {
-          const ratio = model.era
-            ? model.era.ratio
-            : (model.chain.locked ? 1 : model.chain.ratio);
-          bar.style.width = `${Math.round(ratio * 100)}%`;
+          bar.style.width = `${Math.round((model.chain.locked ? 1 : model.chain.ratio) * 100)}%`;
         }
         const val = $("hud-chain-val");
         if (val) {
-          if (model.era) val.textContent = String(model.era.left);
-          else val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
+          val.textContent = model.chain.locked ? "жива" : `${model.chain.current}/${model.chain.need}`;
         }
         const lab = $("hud-chain-label");
-        if (lab) lab.textContent = model.era ? "Эра" : "Цепочка";
-        chainEl.title = model.era
-          ? `Осталось ${model.era.left} циклов до конца эксперимента`
-          : "Живая цепочка";
+        if (lab) lab.textContent = "Цепочка";
+        chainEl.title = "Живая цепочка";
       } else {
         chainEl.classList.add("hidden");
       }
@@ -689,7 +677,7 @@
     renderTrophic($("hud-trophic"), model.trophic, a);
 
     const extraKey = model.trophic.extra.map((s) => `${s.id}${s.value}`).join(",");
-    const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.era?.left ?? ""}|${model.threat?.text || ""}`;
+    const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.threat?.text || ""}`;
     if (statsKey !== app.statsCacheKey) {
       app.statsCacheKey = statsKey;
       const grid = $("stats-grid");

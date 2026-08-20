@@ -28,19 +28,6 @@ World.prototype.noHerbEndLimit = function noHerbEndLimit() {
     return ARCADE_NO_HERB_MAX;
   };
 
-World.prototype.eraProgress = function eraProgress() {
-    const need = ARCADE_ERA_AFTER_CHAIN;
-    if (!this.sustainedChain || !need) return null;
-    const lock = this.chainLockGen != null ? this.chainLockGen : this.generation;
-    const used = Math.max(0, (this.generation || 0) - lock);
-    return {
-      used,
-      need,
-      left: Math.max(0, need - used),
-      ratio: need ? Math.min(1, used / need) : 0
-    };
-  };
-
 World.prototype.checkArcadeEnd = function checkArcadeEnd(energy, herbCost) {
     if (!this.arcade || this.gameOver) return;
     const broke = energy < herbCost;
@@ -49,16 +36,6 @@ World.prototype.checkArcadeEnd = function checkArcadeEnd(energy, herbCost) {
       this.gameOver = true;
       this.gameOverReason = "no_chain";
       return;
-    }
-
-    if (ARCADE_ERA_AFTER_CHAIN > 0 && this.sustainedChain) {
-      if (this.chainLockGen == null) this.chainLockGen = this.generation;
-      const era = this.eraProgress();
-      if (era && era.left <= 0) {
-        this.gameOver = true;
-        this.gameOverReason = "era_complete";
-        return;
-      }
     }
 
     if (this.hasAnimals()) return;

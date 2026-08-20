@@ -12,13 +12,13 @@ describe("каталог таблиц", () => {
       assert.ok(LIFE_TABLES[key], `нет домена ${key}`);
     }
     assert.equal(LIFE_BALANCE.version.patch, 0);
-    assert.equal(LIFE_BALANCE.version.minor, 16);
+    assert.equal(LIFE_BALANCE.version.minor, 17);
     assert.equal(LIFE_BALANCE.tools.herb, LIFE_TABLES.economy.tools.herb);
     assert.equal(LIFE_BALANCE.species.rabbit.drain, LIFE_TABLES.species.units.rabbit.drain);
     assert.equal(LIFE_BALANCE.plants.treeLife, LIFE_TABLES.ecology.plants.treeLife);
     assert.equal(LIFE_BALANCE.scoring.huntEnergyGain, LIFE_TABLES.scoring.formulas.huntEnergyGain);
     assert.equal(LIFE_BALANCE.arcadeEnd.staleAfter, LIFE_TABLES.arcade.arcadeEnd.staleAfter);
-    assert.equal(LIFE_BALANCE.arcadeEnd.eraAfterChain, 300);
+    assert.equal(LIFE_BALANCE.arcadeEnd.chainSustainGens, 25);
     assert.equal(LIFE_BALANCE.arcadeEconomy.surplusDecay, 0);
     assert.equal(LIFE_BALANCE.arcadeEconomy.pulsePerGen, 1);
     assert.equal(LIFE_BALANCE.arcadeEconomy.pulseCap, 90);

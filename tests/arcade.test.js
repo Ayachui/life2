@@ -219,7 +219,7 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     assert.ok((world.energyAudit.pulse || 0) >= 8);
   });
 
-  test("в эре густой лес не блокирует ⚡ ниже cap", () => {
+  test("после цепочки густой лес не блокирует ⚡ ниже cap", () => {
     const { world, T, LIFE_BALANCE } = createWorld(16, 16);
     world.arcade = true;
     world.sustainedChain = true;
@@ -289,7 +289,7 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     assert.equal(world.arcadeToolGate("pred").ok, true);
   });
 
-  test("эра завершает эксперимент после лимита", () => {
+  test("устойчивая цепочка не кончает партию по таймеру", () => {
     const { world, T } = createWorld();
     world.arcade = true;
     world.set(4, 4, T.HERB);
@@ -298,26 +298,8 @@ describe("аркада: импульс ⚡ без налога леса", () => 
     world.sustainedChain = true;
     world.chainLockGen = 10;
     world.generation = 800;
-    world.checkArcadeEnd(0, 45);
-    assert.equal(world.gameOver, true);
-    assert.equal(world.gameOverReason, "era_complete");
-    const era = world.eraProgress();
-    assert.ok(era);
-    assert.equal(era.left, 0);
-  });
-
-  test("до конца эры партия продолжается", () => {
-    const { world, T } = createWorld();
-    world.arcade = true;
-    world.set(4, 4, T.HERB);
-    world.agents = [world.makeAgent(4, 4, T.HERB)];
-    world.setPlant(5, 5, T.STAGE_GRASS, 0);
-    world.sustainedChain = true;
-    world.chainLockGen = 100;
-    world.generation = 200;
-    world.checkArcadeEnd(0, 45);
+    world.checkArcadeEnd(90, 45);
     assert.equal(world.gameOver, false);
-    assert.ok(world.eraProgress().left > 0);
   });
 
   test("давление рулетки растёт со временем", () => {
