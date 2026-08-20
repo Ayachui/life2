@@ -129,16 +129,14 @@ function hudObjective(world, meta = {}) {
   if (!chain.locked) {
     return { title: "Живая цепочка", line: `Держи зайцев ${chain.current}/${chain.need} циклов — откроются медведь и пирамида ⚡.` };
   }
-  const baseCap = hudBalance().arcadeEconomy?.pulseCap ?? 90;
-  const apexCap = hudBalance().arcadeEconomy?.pulseCapApex ?? 175;
+  const bearCost = hudBalance().tools?.bear ?? 175;
   const c = world?.counts?.() || {};
   const hasPred = (c.preds || 0) > 0;
-  const cap = hasPred ? apexCap : baseCap;
   return {
     title: "Цепочка жива",
     line: hasPred
-      ? `⚡ копится до ${cap}. Копи на медведя (${apexCap}). Рулетка каждые 100.`
-      : `⚡ до ${baseCap}. Построй пирамиду: ≥4 зайца, потом лиса — cap ${apexCap} и очки за время.`
+      ? `⚡ копится без потолка. Копи на медведя (${bearCost}). Рулетка каждые 100.`
+      : `⚡ копится без потолка. Пирамида: ≥4 зайца, потом лиса. Медведь — ${bearCost}.`
   };
 }
 
@@ -165,7 +163,7 @@ function hudModel(world, meta = {}) {
     score: world?.lifePoints || 0,
     energy,
     budget,
-    pulseCap: world?.arcadePulseCap?.() ?? hudBalance().arcadeEconomy?.pulseCap ?? 90,
+    pulseCap: world?.arcadePulseCap?.() ?? Infinity,
     energyBand: hudEnergyBand(energy, herbCost, predCost, plantCost),
     energyRatio: Number.isFinite(energy) && budget ? Math.min(1, energy / Math.max(1, budget)) : null,
     chain,

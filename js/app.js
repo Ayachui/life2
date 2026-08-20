@@ -675,6 +675,8 @@
     }
 
     renderTrophic($("hud-trophic"), model.trophic, a);
+    const trophicEl = $("hud-trophic");
+    if (trophicEl) trophicEl.classList.toggle("hidden", !!app.inspect);
 
     const extraKey = model.trophic.extra.map((s) => `${s.id}${s.value}`).join(",");
     const statsKey = `${model.cycles}|${model.score}|${a.label}|${a.score}|${a.grass},${a.bush},${a.tree},${a.herbs},${a.preds},${a.bears}|${a.herbSat}|${a.predSat}|${extraKey}|${model.chain.current}|${model.threat?.text || ""}`;

@@ -51,11 +51,8 @@ World.prototype.arcadeSurplusDecay = function arcadeSurplusDecay() {
   };
 
 World.prototype.arcadePulseCap = function arcadePulseCap() {
-    const eco = this.arcadeEconomyCfg();
-    const apex = eco.pulseCapApex ?? eco.pulseCap ?? 90;
-    const base = eco.pulseCap ?? 90;
-    if (this.sustainedChain && this.predatorCount() > 0) return apex;
-    return base;
+    const cap = this.arcadeEconomyCfg().pulseCap;
+    return Number.isFinite(cap) && cap > 0 ? cap : Infinity;
   };
 
 World.prototype.arcadeToolGate = function arcadeToolGate(toolId) {
@@ -99,7 +96,8 @@ World.prototype.applyArcadePulse = function applyArcadePulse() {
     if (grant <= 0) return 0;
     const energy = Number.isFinite(this.playerEnergy) ? this.playerEnergy : 0;
     const projected = energy + this.pendingEnergy;
-    const room = Math.max(0, this.arcadePulseCap() - projected);
+    const cap = this.arcadePulseCap();
+    const room = Number.isFinite(cap) ? Math.max(0, cap - projected) : grant;
     const burst = eco.maxEnergyPerGen;
     const add = Math.min(grant, room, burst == null ? grant : burst);
     if (add > 0) {

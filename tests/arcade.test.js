@@ -195,7 +195,7 @@ describe("аркада: импульс ⚡ без налога леса", () => 
   });
 
   test("при зайцах ⚡ копится даже в густом лесу", () => {
-    const { world, T, LIFE_BALANCE } = createWorld(16, 16);
+    const { world, T } = createWorld(16, 16);
     world.arcade = true;
     world.playerEnergy = 0;
     world.arcadeBudget = 134;
@@ -215,12 +215,11 @@ describe("аркада: импульс ⚡ без налога леса", () => 
       world.pendingEnergy = 0;
     }
     assert.ok(energy >= 8, `накопили ${energy}`);
-    assert.ok(energy <= LIFE_BALANCE.arcadeEconomy.pulseCap);
     assert.ok((world.energyAudit.pulse || 0) >= 8);
   });
 
-  test("после цепочки густой лес не блокирует ⚡ ниже cap", () => {
-    const { world, T, LIFE_BALANCE } = createWorld(16, 16);
+  test("после цепочки густой лес не блокирует ⚡", () => {
+    const { world, T } = createWorld(16, 16);
     world.arcade = true;
     world.sustainedChain = true;
     world.playerEnergy = 5;
@@ -241,37 +240,38 @@ describe("аркада: импульс ⚡ без налога леса", () => 
       world.pendingEnergy = 0;
     }
     assert.ok(energy > 5, `⚡ должна расти, получили ${energy}`);
-    assert.ok(energy <= LIFE_BALANCE.arcadeEconomy.pulseCap);
     assert.equal(world.energyAudit.upkeep || 0, 0);
   });
 
-  test("импульс не копится выше cap", () => {
-    const { world, T, LIFE_BALANCE } = createWorld();
-    const cap = LIFE_BALANCE.arcadeEconomy.pulseCap;
+  test("импульс копится без потолка запаса", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
     world.arcadeBudget = 134;
-    world.playerEnergy = cap;
+    world.playerEnergy = 90;
     world.set(4, 4, T.HERB);
     world.agents = [world.makeAgent(4, 4, T.HERB)];
-    for (let i = 0; i < 8; i++) {
-      world.playerEnergy = cap;
+    let energy = 90;
+    for (let i = 0; i < 12; i++) {
+      world.playerEnergy = energy;
       world.step();
-      assert.equal(world.pendingEnergy, 0, `pending ${world.pendingEnergy} на шаге ${i}`);
+      energy = Math.max(0, energy + world.pendingEnergy);
       world.pendingEnergy = 0;
     }
+    assert.ok(energy > 90, `запас должен расти выше 90, получили ${energy}`);
+    assert.equal(world.arcadePulseCap(), Infinity);
   });
 
-  test("cap растёт до apex после лисы в цепочке", () => {
-    const { world, T, LIFE_BALANCE } = createWorld();
+  test("лиса не ставит потолок запаса", () => {
+    const { world, T } = createWorld();
     world.arcade = true;
     world.sustainedChain = true;
     world.set(4, 4, T.HERB);
     world.set(5, 5, T.PRED);
     world.agents = [world.makeAgent(4, 4, T.HERB), world.makeAgent(5, 5, T.PRED)];
-    assert.equal(world.arcadePulseCap(), LIFE_BALANCE.arcadeEconomy.pulseCapApex);
+    assert.equal(world.arcadePulseCap(), Infinity);
     world.agents.pop();
     world.set(5, 5, 0);
-    assert.equal(world.arcadePulseCap(), LIFE_BALANCE.arcadeEconomy.pulseCap);
+    assert.equal(world.arcadePulseCap(), Infinity);
   });
 
   test("лису нельзя купить при <4 зайцах", () => {

@@ -123,7 +123,8 @@ describe("HUD: взгляд за секунду", () => {
     }, { gameType: "arcade", started: true });
     assert.equal(o.title, "Цепочка жива");
     assert.match(o.line, /4 зайца/);
-    assert.match(o.line, /175/);
+    assert.match(o.line, /без потолка/);
     assert.equal(o.line.includes("Эра"), false);
+    assert.equal(o.line.includes("cap"), false);
   });
 });

@@ -56,7 +56,7 @@
       `tools: plant ${b.tools.plant} herb ${b.tools.herb} pred ${b.tools.pred}`,
       `mut krol ${b.mutationChance.krol} koala ${b.mutationChance.koala}`,
       `arcade stale ${b.arcadeEnd.staleAfter} chain ${b.arcadeEnd.chainSustainGens}`,
-      `econ pulse ${b.arcadeEconomy?.pulsePerGen} cap ${b.arcadeEconomy?.pulseCap} discov ${b.arcadeEconomy?.discoveryOnlyMutation}`,
+      `econ pulse ${b.arcadeEconomy?.pulsePerGen} burst ${b.arcadeEconomy?.maxEnergyPerGen} discov ${b.arcadeEconomy?.discoveryOnlyMutation}`,
       `roulette ${b.roulette.interval}`
     ].join("\n");
   }
