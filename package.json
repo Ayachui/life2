@@ -8,6 +8,8 @@
     "deploy": "vercel --prod",
     "test": "node --test tests/*.test.js",
     "balance": "node tests/balance-report.cjs",
+    "balance-xlsx": "node tools/balance-xlsx.cjs export",
+    "balance-xlsx:import": "node tools/balance-xlsx.cjs import",
     "playtest": "node tests/economy-report.cjs",
     "ship": "node .cursor/hooks/ship-to-prod.cjs"
   },
