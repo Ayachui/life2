@@ -2,6 +2,6 @@
 (function (root) {
   const T = root.LIFE_TABLES || (root.LIFE_TABLES = {});
   T.meta = {
-    version: { stage: "alpha", major: 0, minor: 15, patch: 1 }
+    version: { stage: "alpha", major: 0, minor: 15, patch: 2 }
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -11,7 +11,7 @@ describe("каталог таблиц", () => {
     for (const key of ["meta", "economy", "scoring", "species", "ecology", "arcade"]) {
       assert.ok(LIFE_TABLES[key], `нет домена ${key}`);
     }
-    assert.equal(LIFE_BALANCE.version.patch, 1);
+    assert.equal(LIFE_BALANCE.version.patch, 2);
     assert.equal(LIFE_BALANCE.version.minor, 15);
     assert.equal(LIFE_BALANCE.tools.herb, LIFE_TABLES.economy.tools.herb);
     assert.equal(LIFE_BALANCE.species.rabbit.drain, LIFE_TABLES.species.units.rabbit.drain);

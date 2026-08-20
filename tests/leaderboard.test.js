@@ -87,7 +87,7 @@ describe("лидерборд API", () => {
   test("normalizeDifficulty и ключи Redis", () => {
     assert.equal(normalizeDifficulty("hardcore"), "hardcore");
     assert.equal(normalizeDifficulty("unknown"), "medium");
-    assert.equal(keyForDifficulty("hard"), "life:arcade:leaderboard-v3:hard");
+    assert.equal(keyForDifficulty("hard"), "life:arcade:leaderboard-v4:hard");
     assert.deepEqual(Object.keys(emptyGrouped()), ["easy", "medium", "hard", "hardcore"]);
   });
 });

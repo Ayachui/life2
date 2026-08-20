@@ -1,5 +1,5 @@
 const LEGACY_KEY = "life:arcade:leaderboard-v2";
-const KEY_PREFIX = "life:arcade:leaderboard-v3";
+const KEY_PREFIX = "life:arcade:leaderboard-v4";
 const MIGRATED_FLAG = `${KEY_PREFIX}:migrated`;
 const MAX = 50;
 

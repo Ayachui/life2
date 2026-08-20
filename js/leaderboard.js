@@ -1,6 +1,6 @@
 const LifeLeaderboard = (() => {
   const API = "/api/leaderboard";
-  const LOCAL_KEY = "life-arcade-local-scores-v3";
+  const LOCAL_KEY = "life-arcade-local-scores-v4";
   const LOCAL_LEGACY = "life-arcade-local-scores-v2";
 
   const DIFFICULTIES = ["easy", "medium", "hard", "hardcore"];
