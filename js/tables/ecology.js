@@ -15,11 +15,10 @@
       bushBites: 4,
       grassEnergy: 3.5,
       bushEnergyPerBite: 0.85,
-      treeBitesCow: 10,
+      bushBitesPerTickCow: 2,
+      bushEnergyPerBiteCow: 2.5,
       treeBitesElk: 8,
       treeEnergyPerBite: 0.45,
-      treeEnergyPerBiteCow: 2.0,
-      treeBitesPerTickCow: 3,
       bushToTreeGrass: 2,
       treeEnergyPerBiteKoala: 0.85
     },
@@ -31,6 +30,7 @@
     },
 
     fertilizer: { ttl: 5, strength: 0.3 },
+    cowManure: { ttl: 8, strength: 0.5, radius: 1 },
 
     mushrooms: { cowInterval: 18, cowChance: 0.12, energy: 2.5 },
 

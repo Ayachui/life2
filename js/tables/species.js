@@ -15,7 +15,7 @@
 
     mutationChance: {
       krol: 0.0025,
-      koala: 0.02,
+      koala: 0.01,
       cow: 0.01,
       wolf: 0.02,
       elk: 0.02
@@ -48,8 +48,10 @@
 
     behavior: {
       wolfSolitude: 10,
+      wolfCowPriority: 12,
       elkPoopInterval: 5,
       koalaHideRange: 1,
+      koalaTreeDowngradeGens: 5,
       koalaPerchCapacity: { tree: 1, bush: 0.5, max: 10 },
       skillBoostMul: 2
     }

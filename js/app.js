@@ -1172,7 +1172,7 @@
         return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.bushToTree} тиков. Укусов: ${w.plantBites[i]}. До дерева ~${Math.max(0, left)}. Сеет траву рядом.`;
       }
       if (w.plantStage[i] === T.STAGE_TREE) {
-        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Едят корова, лось и коала (не убивая). После гибели — 1 трава.`;
+        return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.treeLife}. Ест лось; коала за ${LIFE_BALANCE.behavior?.koalaTreeDowngradeGens ?? 5} циклов стачивает в куст. После гибели — 1 трава.`;
       }
       const toBush = PLANT_CFG.grassToBush - age;
       return `<b>${name}</b><br>Возраст ${age}/${PLANT_CFG.grassToBush} тиков. Укусов: ${w.plantBites[i]}. До куста ~${Math.max(0, toBush)}.`;

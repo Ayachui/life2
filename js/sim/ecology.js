@@ -58,7 +58,7 @@ World.prototype.mealFromEating = function mealFromEating(a) {
     if (this.get(x, y) !== PLANT) return null;
     const stage = this.plantStageAt(x, y);
     if (stage === STAGE_GRASS || stage === STAGE_BUSH) return { x, y, stage };
-    if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a) || isKoala(a))) return { x, y, stage };
+    if (stage === STAGE_TREE && (isElk(a) || isKrolDushegub(a) || isKoala(a))) return { x, y, stage };
     return null;
   };
 
@@ -70,9 +70,7 @@ World.prototype.startEating = function startEating(a, meal) {
     }
     a.eating = { x: meal.x, y: meal.y };
     if (meal.stage === STAGE_TREE && this.plantBites[this.idx(meal.x, meal.y)] <= 0 && !isKoala(a)) {
-      const bites = isCow(a) ? PLANT_CFG.treeBitesCow
-        : isKrolDushegub(a) ? 4
-        : PLANT_CFG.treeBitesElk;
+      const bites = isKrolDushegub(a) ? 4 : PLANT_CFG.treeBitesElk;
       this.plantBites[this.idx(meal.x, meal.y)] = bites;
     }
     this.eatPlant(a, meal);
@@ -127,11 +125,13 @@ World.prototype.eatMushroom = function eatMushroom(a, x, y) {
     return true;
   };
 
-World.prototype.addFertilizer = function addFertilizer(x, y) {
+World.prototype.addFertilizer = function addFertilizer(x, y, cfg) {
+    const use = cfg || FERTILIZER_CFG;
     this.fertilizers.push({
       x, y,
-      ttl: FERTILIZER_CFG.ttl,
-      strength: FERTILIZER_CFG.strength
+      ttl: use.ttl ?? FERTILIZER_CFG.ttl,
+      strength: use.strength ?? FERTILIZER_CFG.strength,
+      radius: use.radius ?? 1
     });
     this.fx.push({ x, y, color: "#8b6914", t: 1.4, fert: true });
     this.chime("fertilize");
@@ -225,7 +225,8 @@ World.prototype.decayBoost = function decayBoost(x, y) {
 World.prototype.fertilizerBoost = function fertilizerBoost(x, y) {
     let boost = 0;
     for (const f of this.fertilizers) {
-      if (Math.abs(f.x - x) <= 1 && Math.abs(f.y - y) <= 1) boost = Math.max(boost, f.strength);
+      const r = f.radius ?? 1;
+      if (Math.abs(f.x - x) <= r && Math.abs(f.y - y) <= r) boost = Math.max(boost, f.strength);
     }
     return boost;
   };
@@ -252,17 +253,24 @@ World.prototype.eatPlant = function eatPlant(a, meal) {
     const stage = this.plantStage[i];
     const mult = a.kind === BEAR ? 0.82 : isKoala(a) ? 0.9 : 1;
     if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
+      const cowBush = isCow(a) && stage === STAGE_BUSH;
       const perBite = stage === STAGE_GRASS
         ? PLANT_CFG.grassEnergy / PLANT_CFG.grassBites
-        : PLANT_CFG.bushEnergyPerBite;
-      const gained = perBite * mult * skillMul(a);
-      this.plantBites[i]--;
-      a.energy += gained;
-      this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
+        : cowBush
+          ? (PLANT_CFG.bushEnergyPerBiteCow ?? 2.5)
+          : PLANT_CFG.bushEnergyPerBite;
+      const bitesThisTick = cowBush ? (PLANT_CFG.bushBitesPerTickCow ?? 2) : 1;
+      for (let b = 0; b < bitesThisTick && this.plantBites[i] > 0; b++) {
+        this.plantBites[i]--;
+        const gained = perBite * mult * skillMul(a);
+        a.energy += gained;
+        this.awardProcessedEnergy(gained, a, this.plantStageTier(stage));
+      }
       if (this.plantBites[i] <= 0) {
         this.clearPlant(meal.x, meal.y);
         a.eating = null;
-      } else if (a.energy >= a.thresh && !isKrolDushegub(a)) {
+        if (cowBush) this.addFertilizer(meal.x, meal.y, COW_MANURE_CFG);
+      } else if (a.energy >= a.thresh && !isKrolDushegub(a) && !cowBush) {
         a.eating = null;
       }
       this.chime(stage === STAGE_GRASS ? "eat_grass" : "eat_bush");
@@ -273,10 +281,9 @@ World.prototype.eatPlant = function eatPlant(a, meal) {
       this.grantArcadeEnergy("koalaTreeBite");
       if (a.energy >= a.thresh) a.eating = null;
       this.chime("eat_tree");
-    } else if (stage === STAGE_TREE && (isCow(a) || isElk(a) || isKrolDushegub(a))) {
-      const bitesThisTick = isCow(a) ? PLANT_CFG.treeBitesPerTickCow : 1;
-      const perBite = isCow(a) ? PLANT_CFG.treeEnergyPerBiteCow
-        : PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
+    } else if (stage === STAGE_TREE && (isElk(a) || isKrolDushegub(a))) {
+      const bitesThisTick = 1;
+      const perBite = PLANT_CFG.treeEnergyPerBite * (isKrolDushegub(a) ? 1.2 : 1);
       for (let b = 0; b < bitesThisTick && this.plantBites[i] > 0; b++) {
         this.plantBites[i]--;
         const gained = perBite * skillMul(a);

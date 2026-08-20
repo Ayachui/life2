@@ -224,7 +224,7 @@ var World = class World {
     } else if (c.herbs && foodPerHerb < 1.2) {
       score = Math.max(18, Math.round(22 + herbSat * 0.2));
       label = "голод";
-      note = "Зайцам мало травы и кустов. Деревья едят только корова и лось.";
+      note = "Зайцам мало травы и кустов. Кусты ест корова, деревья — лось и коала.";
     } else if (c.preds && c.herbs && preyPerFox < 1.3) {
       score = 28;
       label = "слишком много лис";

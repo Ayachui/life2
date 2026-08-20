@@ -24,6 +24,7 @@ function assembleLifeBalance(tables) {
     plants: ecology.plants,
     decay: ecology.decay,
     fertilizer: ecology.fertilizer,
+    cowManure: ecology.cowManure,
     mushrooms: ecology.mushrooms,
     water: ecology.water,
     terrain: ecology.terrain,

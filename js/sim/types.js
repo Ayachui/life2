@@ -8,21 +8,24 @@ var BAL = typeof LIFE_BALANCE !== "undefined" ? LIFE_BALANCE : {};
 var PLANT_CFG = { ...BAL.plants };
 var DECAY_CFG = { ...BAL.decay };
 var FERTILIZER_CFG = { ...(BAL.fertilizer || { ttl: 5, strength: 0.3 }) };
+var COW_MANURE_CFG = { ...(BAL.cowManure || { ttl: 8, strength: 0.5, radius: 1 }) };
 var MUSHROOM_CFG = { ...(BAL.mushrooms || { cowInterval: 18, cowChance: 0.12, energy: 2.5 }) };
 
 var TRAIT = { ...(BAL.traitIds || {
   KROL: "крол-душегуб", KOALA: "коала", COW: "корова", WOLF: "волк", ELK: "лось"
 }) };
 
-var MUT_CHANCE = { ...(BAL.mutationChance || { krol: 0.0025, koala: 0.02, cow: 0.01, wolf: 0.02, elk: 0.02 }) };
+var MUT_CHANCE = { ...(BAL.mutationChance || { krol: 0.0025, koala: 0.01, cow: 0.01, wolf: 0.02, elk: 0.02 }) };
 
 var KROL_LIFESPAN = BAL.species?.krol?.lifespan ?? 15;
 var KROL_DEATH_SPAWN = BAL.species?.krol?.deathSpawn ?? 3;
 var KROL_MOVES_PER_TICK = BAL.species?.krol?.movesPerTick ?? 6;
 var KROL_SIZE = BAL.species?.krol?.size ?? 2;
 var WOLF_SOLITUDE = BAL.behavior?.wolfSolitude ?? 10;
+var WOLF_COW_PRIORITY = BAL.behavior?.wolfCowPriority ?? 12;
 var ELK_POOP_INTERVAL = BAL.behavior?.elkPoopInterval ?? 5;
 var KOALA_HIDE_RANGE = BAL.behavior?.koalaHideRange ?? 1;
+var KOALA_TREE_DOWNGRADE_GENS = BAL.behavior?.koalaTreeDowngradeGens ?? 5;
 var SPECIES_CFG = typeof buildSpeciesCfg === "function"
   ? buildSpeciesCfg(TRAIT, BAL.species || {})
   : {};

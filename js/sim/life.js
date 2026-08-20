@@ -158,6 +158,30 @@ World.prototype.koalaHidden = function koalaHidden(a) {
     return koalaPerchedOn(this, a);
   };
 
+World.prototype.tickKoalaTreeChew = function tickKoalaTreeChew(a) {
+    if (!isKoala(a) || a.dead) return false;
+    const x = a.x;
+    const y = a.y;
+    if (!koalaPerchedOn(this, a) || this.plantStageAt(x, y) !== STAGE_TREE) {
+      a.treeChew = 0;
+      return false;
+    }
+    const need = KOALA_TREE_DOWNGRADE_GENS;
+    a.treeChew = (a.treeChew || 0) + 1;
+    if (a.treeChew < need) return false;
+    this.setPlant(x, y, STAGE_BUSH, 0);
+    a.treeChew = 0;
+    a.eating = null;
+    this.spark(x, y, "#46d070");
+    this.chime("evolve_bush");
+    const next = this.findNearestEmptyPerch(x, y, this.effectiveVision(a));
+    if (next && (next.x !== x || next.y !== y)) {
+      const step = this.stepToward(x, y, next.x, next.y);
+      if (step && this.canAgentMoveTo(a, step.x, step.y)) this.moveAgentTo(a, step.x, step.y);
+    }
+    return true;
+  };
+
 World.prototype.koalaCount = function koalaCount() {
     return this.agents.filter((a) => !a.dead && isKoala(a)).length;
   };
@@ -240,9 +264,7 @@ World.prototype.perceive = function perceive(agent) {
           const stage = this.plantStageAt(nx, ny);
           if (stage === STAGE_GRASS || stage === STAGE_BUSH) {
             food.push({ x: nx, y: ny, stage, dist: cheb, man });
-          } else if (stage === STAGE_TREE && (isCow(agent) || isElk(agent) || isKrolDushegub(agent) || isKoala(agent))) {
-            food.push({ x: nx, y: ny, stage, dist: cheb, man });
-          } else if (stage === STAGE_BUSH && isKoala(agent)) {
+          } else if (stage === STAGE_TREE && (isElk(agent) || isKrolDushegub(agent) || isKoala(agent))) {
             food.push({ x: nx, y: ny, stage, dist: cheb, man });
           }
         }
@@ -299,7 +321,7 @@ World.prototype.herbFoodRank = function herbFoodRank(agent, item) {
       return 2;
     }
     if (isCow(agent)) {
-      if (stage === STAGE_TREE) return 0;
+      if (stage === STAGE_BUSH) return 0;
       if (stage === STAGE_GRASS) return 1;
       return 2;
     }
@@ -344,7 +366,7 @@ World.prototype.findNearestEdible = function findNearestEdible(x, y, range, metr
     let bestGrass = null, bestGrassD = 99;
     let bestBush = null, bestBushD = 99;
     let bestTree = null, bestTreeD = 99;
-    const canEatTree = eater && (isCow(eater) || isElk(eater) || isKrolDushegub(eater) || isKoala(eater));
+    const canEatTree = eater && (isElk(eater) || isKrolDushegub(eater) || isKoala(eater));
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
         if (!dx && !dy) continue;
@@ -366,7 +388,7 @@ World.prototype.findNearestEdible = function findNearestEdible(x, y, range, metr
         }
       }
     }
-    if (isCow(eater)) return bestTree || bestGrass || bestBush;
+    if (isCow(eater)) return bestBush || bestGrass;
     if (isElk(eater)) return bestTree || bestGrass || bestBush;
     if (isKoala(eater)) return bestTree || bestBush || bestGrass;
     return bestGrass || bestBush || bestTree;
@@ -382,8 +404,8 @@ World.prototype.preyPriority = function preyPriority(hunter, prey, px, py) {
     if (isKrolDushegub(hunter) && prey.kind === BEAR) score -= 0.5;
     if (isKrolDushegub(hunter) && (isWolf(prey) || isElk(prey))) score -= 0.35;
     if (isKrolDushegub(hunter) && (isCow(prey) || isKoala(prey))) score -= 0.2;
-    if (isWolf(hunter) && isCow(prey)) score -= 0.3;
-    if (isWolf(hunter) && prey.kind === HERB) score -= 0.1;
+    if (isWolf(hunter) && isCow(prey)) score -= WOLF_COW_PRIORITY;
+    if (isWolf(hunter) && prey.kind === HERB && !isCow(prey)) score -= 0.1;
     if (isKoala(prey) && this.koalaHidden(prey)) score += 1.2;
     return score;
   };
@@ -588,6 +610,7 @@ World.prototype.stepSated = function stepSated(a) {
     if (isKoala(a)) {
       if (!this.shouldMoveThisTick(a)) return;
       const perched = koalaPerchedOn(this, a);
+      if (perched && this.plantStageAt(a.x, a.y) === STAGE_TREE) return;
       if (perched && this.rng() >= this.wanderBiasChance(a)) return;
       const dir = this.seekKoalaHangout(a);
       const nx = a.x + dir.x;
@@ -1043,7 +1066,6 @@ World.prototype.canTryBreed = function canTryBreed(a, wasSatedAtTickStart) {
     if (!wasSatedAtTickStart || a.energy < a.thresh || a.cool > 0) return false;
     if (isKoala(a)) {
       if (!koalaPerchedOn(this, a)) return false;
-      if (this.plantStageAt(a.x, a.y) !== STAGE_TREE) return false;
       const cap = this.koalaPerchCapacity();
       if (cap > 0 && this.koalaCount() >= cap) return false;
     }
@@ -1283,6 +1305,9 @@ World.prototype.stepAgents = function stepAgents() {
         this.stepSated(a);
       }
 
+      if (a.dead) continue;
+
+      if (isKoala(a)) this.tickKoalaTreeChew(a);
       if (a.dead) continue;
 
       if (this.canTryBreed(a, wasSated)) {

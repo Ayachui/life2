@@ -147,8 +147,9 @@ describe("баланс: мутации", () => {
 
   test("базовый шанс вида при рождении умеренный", () => {
     const { LIFE_BALANCE, MUT_CHANCE } = createWorld();
-    assert.equal(MUT_CHANCE.koala, 0.02);
-    assert.equal(LIFE_BALANCE.mutationChance.koala, 0.02);
+    assert.equal(MUT_CHANCE.koala, 0.01);
+    assert.equal(MUT_CHANCE.cow, 0.01);
+    assert.equal(LIFE_BALANCE.mutationChance.koala, LIFE_BALANCE.mutationChance.cow);
   });
 
   test("буст мутации: ×2 за каждое поколение существа", () => {

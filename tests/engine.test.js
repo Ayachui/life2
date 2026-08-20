@@ -968,23 +968,40 @@ describe("террейн и рулетка", () => {
 });
 
 describe("корова и наследование мутантов", () => {
-  test("корова насыщается от дерева за ~4 цикла", () => {
-    const { world, T, PLANT_CFG } = createWorld();
+  test("корова ест куст за 2 цикла и оставляет удобрение +50%", () => {
+    const { world, T, LIFE_BALANCE } = createWorld();
     const cow = world.makeAgent(5, 5, T.HERB);
     world.applySpeciesTrait(cow, "корова", 5, 5);
     cow.energy = 12;
     world.set(5, 5, T.HERB);
-    world.setPlant(6, 5, T.STAGE_TREE, 0);
-    world.plantBites[world.idx(6, 5)] = PLANT_CFG.treeBitesCow;
+    world.setPlant(6, 5, T.STAGE_BUSH, 0);
+    world.setPlant(7, 5, T.STAGE_GRASS, 0);
     world.agents = [cow];
-    let peak = cow.energy;
-    for (let i = 0; i < 5; i++) {
-      world.stepAgents();
-      peak = Math.max(peak, cow.energy);
-      if (peak >= cow.thresh) break;
-    }
-    assert.ok(peak >= cow.thresh, `peak energy ${peak} < thresh ${cow.thresh}`);
-    assert.ok(world.plantBites[world.idx(6, 5)] < PLANT_CFG.treeBitesCow, "дерево должно быть частично съедено");
+    const before = cow.energy;
+    for (let i = 0; i < 2; i++) world.stepAgents();
+    assert.ok(cow.energy > before, `энергия ${cow.energy}`);
+    assert.equal(world.get(6, 5), T.EMPTY, "куст должен быть съеден");
+    assert.ok(world.fertilizers.length > 0, "на месте куста удобрение");
+    assert.equal(world.growthMulAt(7, 5), 1 + LIFE_BALANCE.cowManure.strength);
+    world.setPlant(8, 5, T.STAGE_TREE, 0);
+    const meal = world.findNearestEdible(5, 5, 8, "scout", cow);
+    assert.ok(meal);
+    assert.notEqual(meal.stage, T.STAGE_TREE, "корова не должна целиться в дерево");
+  });
+
+  test("волк целится в корову даже если заяц ближе", () => {
+    const { world, T } = createWorld();
+    const wolf = world.makeAgent(3, 5, T.PRED);
+    world.applySpeciesTrait(wolf, "волк", 3, 5);
+    const rabbit = world.makeAgent(4, 5, T.HERB);
+    const cow = world.makeAgent(10, 5, T.HERB);
+    world.applySpeciesTrait(cow, "корова", 10, 5);
+    world.agents = [wolf, rabbit, cow];
+    const prey = world.findNearestPrey(wolf.x, wolf.y, 12, wolf);
+    assert.ok(prey);
+    assert.equal(prey.x, 10);
+    assert.equal(prey.y, 5);
+    assert.equal(world.canHunt(wolf, cow), true);
   });
 
   test("мутант передаёт вид потомству", () => {
@@ -1101,7 +1118,23 @@ describe("коала", () => {
     assert.equal(world.plantStageAt(6, 5), T.STAGE_TREE);
   });
 
-  test("грызёт дерево, не убивая его", () => {
+  test("за 5 циклов стачивает дерево в куст и идёт к следующему", () => {
+    const { world, T, LIFE_BALANCE } = createWorld();
+    world.setPlant(6, 5, T.STAGE_TREE, 0);
+    world.setPlant(10, 5, T.STAGE_TREE, 0);
+    const koala = world.makeAgent(6, 5, T.HERB);
+    world.applySpeciesTrait(koala, "коала", 6, 5);
+    koala.energy = 8;
+    koala.thresh = 14;
+    world.agents = [koala];
+    const need = LIFE_BALANCE.behavior.koalaTreeDowngradeGens;
+    for (let i = 0; i < need; i++) world.stepAgents();
+    assert.equal(world.plantStageAt(6, 5), T.STAGE_BUSH);
+    assert.equal(world.get(6, 5), T.PLANT);
+    assert.ok(koala.x !== 6 || koala.y !== 5, "коала должна уйти к другому дереву");
+  });
+
+  test("грызёт дерево, один укус не валит его", () => {
     const { world, T } = createWorld();
     const koala = world.makeAgent(6, 5, T.HERB);
     world.applySpeciesTrait(koala, "коала", 6, 5);
